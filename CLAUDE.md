@@ -45,7 +45,11 @@ Entry: `src/game.js` (frame loop, `?test` hook). Everything else is an ES module
 | `render/materials.js` | `T` textures, `M` world materials, `SM` soldier materials |
 | `render/baked.js` | `addBaked()` for baked Blender models |
 | `world/geo.js` | addBox, addCyl, quad, wallQuad, win, addArch, pier, lanterns |
-| `world/level.js` | `buildLevel()` for both courtyards, fixed lighting, sky, AMMO_SPOTS |
+| `world/level.js` | thin: calls the area builders in fixed order, then sky, targets, fixed lighting |
+| `world/yard1.js` | manor yard (east): manor, stable, walls, gate, fountain, props, trucks, tank, ammo |
+| `world/yard2.js` | enemy yard (west) + archway passage: walls, barracks, cover, props |
+| `world/detail.js` | cornices, pilasters, dormers, chimneys, buttress piers |
+| `world/props.js` | shared `R` (seeded RNG; build order yard1 → yard2 → detail), `crate()`, `AMMO_SPOTS` |
 | `world/targets.js` | practice targets |
 | `world/update.js` | per-frame world: targets, light flicker/selection, water, sky, rumble |
 | `weapons/guns.js` | weapon table `WEAPONS`, viewmodels, `gun` state, `G` (brass) |
@@ -53,7 +57,9 @@ Entry: `src/game.js` (frame loop, `?test` hook). Everything else is an ES module
 | `player/update.js` | per-frame player: look, move, weapon state machine, reload/switch animation |
 | `player/shooting.js` | `fire()`, `tryReload()` |
 | `player/collide.js` | `resolve()` push-out collision |
-| `enemies/soldiers.js` | enemy bodies, arm IK, AI (`updateEnemies`), `hitEnemy`, `hurtPlayer`, shouts |
+| `enemies/soldiers.js` | enemy bodies, hit boxes, arm IK, `poseEnemy`, `resetEnemy`; spawns from `ENEMY_SPAWNS` |
+| `enemies/ai.js` | `updateEnemies`: line of sight, archway navigation, chase/strafe/patrol, falling |
+| `enemies/combat.js` | `shoutFrom`, `alertEnemy`, `hitEnemy`, `hurtPlayer`, `enemyShoot` |
 | `effects/fx.js` | bullet decals and debris particle pools |
 | `audio/audio.js` | Web Audio SFX (`SFX`) and the ambient drone |
 | `ui/hud.js` | `drawHUD()` |
@@ -74,11 +80,24 @@ Line numbers are no longer needed for navigation: find things by filename (see t
 - Textures use nearest-neighbour filtering and no mipmaps — keep the PS1 look.
 - Balance and feel numbers live in `core/config.js`. Change them there, not in the systems. Example: to make the MP40 hit harder, edit `WEAPON_DEFS[1].dmg`.
 - `core/config.js` imports nothing and holds data only.
-- Not yet in config (still literals in their module): fire spread, reload timings, enemy shout cooldown, and the level layout.
+- Not yet in config (still literals in their module): fire spread, reload timings, enemy shout cooldown, and the level geometry (enemy spawns and archway waypoints ARE in config: `ENEMY_SPAWNS`, `ARCH_WAYPOINTS`).
 
 ## History
 - `archive/game.monolith-original.js` is the pre-refactor single-file `game.js` (1,456 lines). Reference only; not built or linted. Use it to compare old behaviour, not as a source to edit.
 - Refactor into modules was done in one pass; behaviour was verified with the smoke test above.
+
+## Task → files (open only these)
+- Weapon feel/damage → `core/config.js` (WEAPON_DEFS), then `player/update.js`, `weapons/guns.js`
+- Enemy count/placement/patrols → `core/config.js` (ENEMY_SPAWNS)
+- Enemy behaviour → `enemies/ai.js`; enemy damage/shouts → `enemies/combat.js`; enemy look/pose → `enemies/soldiers.js`
+- Level geometry → `world/yard1.js` / `yard2.js` / `detail.js` (helpers in `world/geo.js`)
+- HUD → `ui/hud.js`; sounds → `audio/audio.js`; shaders → `render/shaders.js`
+- Textures: `textures.js` = pixel helpers (`rng`, `tex`, `blotch`, `drawText`) + `makeTextures()` (base world `T.*`); `textures2.js` `upgradeTextures(T)` replaces some with better versions; `textures3.js` `soldierTextures(T)`. `render/materials.js` maps `T` → `M`/`SM`. To add a texture, add a key in the right builder and reference it in `materials.js`; don't read the whole file.
+
+## Token hygiene
+- `.ignore` hides `src/models/`, `archive/`, build output from Grep/Glob. Don't remove it.
+- After every edit run `npm test` (check + lint) only. Run the browser smoke test only for gameplay changes.
+- Browser pane gotcha: `requestAnimationFrame` stalls until the pane is screenshotted, so take a screenshot right after navigating and before driving `window.__g`.
 
 ## Workflow rules
 - Make one change at a time; run `npm run check` after each.
