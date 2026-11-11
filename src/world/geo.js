@@ -21,7 +21,7 @@ export function worldUV(geo, tile, ox, oy, oz, aspect = 1) {
   }
 }
 export function addBox(cx, y0, cz, w, h, d, material, o = {}) {
-  const seg = o.seg || 2.5;
+  const seg = o.seg || 1.0;   // max piece length (m): short pieces keep the affine texture warp small on long walls
   const g = new THREE.BoxGeometry(w, h, d, Math.max(1, Math.round(w / seg)), Math.max(1, Math.round(h / seg)), Math.max(1, Math.round(d / seg)));
   if (!o.fit) worldUV(g, o.tile || 2, cx, y0 + h / 2, cz, material.userData.aspect || 1);
   const m = new THREE.Mesh(g, material);
