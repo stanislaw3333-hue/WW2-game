@@ -1,7 +1,7 @@
 // Per-frame player update: look, movement, weapon state machine, reload and switch animation, and the viewmodel pose.
 import { V3, clamp, lerp, sstep } from '../core/util.js';
 import { S, say, player, keys } from '../core/state.js';
-import { PLAYER, GRENADE } from '../core/config.js';
+import { PLAYER, GRENADE, K98_CLIP_IN_T } from '../core/config.js';
 import { camera } from '../render/renderer.js';
 import { SFX } from '../audio/audio.js';
 import { G, WEAPONS, gun, curW } from '../weapons/guns.js';
@@ -83,6 +83,7 @@ export function update(dt) {
       rot = sstep(0.35, 0.5, t) - sstep(1.95, 2.1, t); back = sstep(0.5, 0.7, t) - sstep(1.75, 1.95, t);
       // the reload sample (started in tryReload) carries the mechanical sounds; only the refill happens here
       if (p < 1.35 && t >= 1.35) { const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
+      if (p < K98_CLIP_IN_T && t >= K98_CLIP_IN_T) SFX.clipIn();
       // stripper clip: hand brings it down onto the open receiver, rounds drop in, clip is discarded
       clipOn = t > 0.7 && t < 1.38;
       clipY = 0.13 - sstep(0.75, 1.05, t) * 0.083;

@@ -36,7 +36,6 @@ export function buildYard2() {
   addBox(-62.5, 0, 5, 0.3, 4.3, 6, M.gate, { fit: true, wood: true });
   cap(-62.5, 5, 1.3, 30);
   addBox(-47, 0, 20.5, 32, 4.5, 1, M.brick, { tile: 3 }); cap(-47, 20.5, 32, 1.3);
-  wallQuad('N', -40, 19.97, 1.7, 1.3, 3.2, M.flag); wallQuad('N', -54, 19.97, 1.7, 1.3, 3.2, M.flag);
   wallQuad('E', -61.97, 6, 1.2, 1.4, 2.7, M.poster);
   // barracks on the north side
   addBox(-47, 0, -13, 32, 7, 6, M.facade, { tile: 2.8 });
@@ -72,8 +71,6 @@ export function buildYard2() {
   // German radio set (the chatter is positioned from RADIO in audio/audio.js)
   addBox(RADIO.x, RADIO.y, RADIO.z, 0.36, 0.18, 0.24, M.radio, { solid: false, shoot: false, rotY: 0.35, fit: true });
   addBox(RADIO.x + 0.12, RADIO.y + 0.18, RADIO.z - 0.04, 0.012, 0.55, 0.012, M.emetal, { solid: false, shoot: false });
-  for (const [x, z] of [[-60.5, -8.6], [-59.5, -8.9], [-60.3, -7.6], [-33.4, -8.2], [-46, 18.6], [-45, 18.9]])
-    addCyl(x, 0, z, 0.4, 1.05, M.barrel, { wood: true, cr: 0.42 });
   // Panzer I moved from the manor yard: parked just inside the west gate, nose toward it (hull collision, shootable)
   {
     const tank = new THREE.Group(); tank.position.set(-56, 0, -2.5); tank.rotation.y = Math.PI / 2; scene.add(tank);

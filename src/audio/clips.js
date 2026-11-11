@@ -59,6 +59,16 @@ import convo_08 from './clips/convo_08.mp3';
 import convo_09 from './clips/convo_09.mp3';
 import convo_10 from './clips/convo_10.mp3';
 import convo_11 from './clips/convo_11.mp3';
+import death_01 from './clips/german_death_01.wav';
+import death_02 from './clips/german_death_02.wav';
+import death_03 from './clips/german_death_03.wav';
+import death_04 from './clips/german_death_04.wav';
+import death_05 from './clips/german_death_05.wav';
+import death_06 from './clips/german_death_06.wav';
+import death_07 from './clips/german_death_07.wav';
+import death_08 from './clips/german_death_08.wav';
+import death_09 from './clips/german_death_09.wav';
+import death_10 from './clips/german_death_10.wav';
 
 export const CLIPS = {
   kar98Shot, kar98Reload, kar98Rechamber, mp40Shot, mp40Reload, siren, radio, grenade, footstep,
@@ -117,4 +127,5 @@ export const CLIPS = {
     convo_10,
     convo_11,
   ],
+  deaths: [death_01, death_02, death_03, death_04, death_05, death_06, death_07, death_08, death_09, death_10],
 };

@@ -34,6 +34,7 @@ export function hitEnemy(e, part, dmg) {
   if (e.hp > 0) { shoutFrom(e, 'Getroffen!', 0.35); return; }
   shoutFrom(e, 'Gefallen!', 0.8);
   e.alive = false; e.fallV = 1.5; e.flash = 0; e.flashM.visible = false; S.kills++; refreshEnemyParts();
+  SFX.death();
   const all = S.kills >= enemies.length;
   if (all) SFX.done();
 }

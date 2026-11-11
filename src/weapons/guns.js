@@ -76,9 +76,10 @@ function buildGuns() {
     c.position.copy(A).add(B).multiplyScalar(0.5); c.quaternion.setFromUnitVectors(new V3(0, 1, 0), B.clone().sub(A).normalize());
     g.add(c); return g;
   };
-  const flashes = (root, z) => {
-    const f1 = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), fm); f1.position.set(0, 0.026, z); f1.visible = false; root.add(f1); setFlashFrame(f1, 0);
-    const f2 = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.12), fm); f2.position.set(0, 0.026, z); f2.rotation.y = Math.PI / 2; f2.visible = false; root.add(f2); setFlashFrame(f2, 0);
+  // y is the flash height on the viewmodel; the planes are 1.5x the size they were before
+  const flashes = (root, z, y = 0.026) => {
+    const f1 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), fm); f1.position.set(0, y, z); f1.visible = false; root.add(f1); setFlashFrame(f1, 0);
+    const f2 = new THREE.Mesh(new THREE.PlaneGeometry(0.51, 0.18), fm); f2.position.set(0, y, z); f2.rotation.y = Math.PI / 2; f2.visible = false; root.add(f2); setFlashFrame(f2, 0);
     return [f1, f2];
   };
 
@@ -93,7 +94,7 @@ function buildGuns() {
     ball(0.011, 0.052, -0.017, 0, metal, bolt);
     const left = arm(root, -0.004, -0.052, 0.29, -0.27, -0.33, -0.08, 1.15);
     const right = arm(root, 0.006, -0.058, -0.15, 0.14, -0.28, -0.52);
-    const [flash, flash2] = flashes(root, -0.767);   // centred on the muzzle tip, measured on the viewmodel
+    const [flash, flash2] = flashes(root, -0.767, 0.012);   // centred on the muzzle tip, measured on the viewmodel; a little lower than the MP40's
     // stripper clip: five cartridges standing in a steel strip, pressed down into the receiver during reload
     const clip = new THREE.Group(); root.add(clip); clip.visible = false;
     const brass = mat(T.brass, o);
@@ -112,7 +113,7 @@ function buildGuns() {
     const magNew = mag.clone(); root.add(magNew); magNew.visible = false;   // fresh magazine that is inserted during reload
     const left = arm(root, -0.002, -0.128, 0.156, -0.25, -0.35, -0.12, 1.1);
     const right = arm(root, 0.004, -0.074, -0.066, 0.15, -0.28, -0.45);
-    const [flash, flash2] = flashes(root, -0.466);   // centred on the muzzle tip, measured on the viewmodel
+    const [flash, flash2] = flashes(root, -0.466, 0.0);   // centred on the muzzle tip, measured on the viewmodel; lowered to the barrel's axis
     WEAPONS[1].m = { root, bolt, mag, magNew, left, right, flash, flash2 };
   }
 

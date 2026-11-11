@@ -42,7 +42,7 @@ export const RADIO = { x: -47.5, y: 1.2, z: 2 };
 // 15.5 m: half the 31 m the first test used, since voices were still heard from the fountain.
 export const VOICE_RADIUS = 15.5;
 // German conversations (soldiers talking to each other, chatter.js) are heard within this distance of the speaker, in metres
-export const CHATTER_RADIUS = 30;   // bottom of the set: on top of the crate, right of centre of the enemy yard seen from the passage
+export const CHATTER_RADIUS = 45;   // bottom of the set: on top of the crate, right of centre of the enemy yard seen from the passage
 export const ENEMY_SPAWNS = [
   // three stand around the radio (RADIO), facing the passage (+x); three patrol across the middle of the yard
   { x: -50.2, z: 0.6,  yaw: E,       patrol: null, officer: false, look: { uni: 0, face: 0 } },
@@ -60,7 +60,7 @@ export const ARCH_WAYPOINTS = { A: { x: -20.4, z: 10.5 }, B: { x: -32.6, z: 10.5
 // hip/adsY/adsZ are the viewmodel offsets; kz/kr are recoil kick (position/rotation).
 export const WEAPON_DEFS = [
   { id: 'k98', name: 'KAR 98K', mag: 5, ammo: 5, reserve: 45, max: 45, dmg: 140, auto: false, fov: 36, hip: [0.15, -0.165, -0.40], hipYaw: 0.075, adsY: -0.0605, adsZ: -0.36, kz: 0.07, kr: 0.1 },
-  { id: 'mp40', name: 'MP 40', mag: 32, ammo: 32, reserve: 128, max: 128, dmg: 34, auto: true, fov: 47, hip: [0.19, -0.135, -0.41], hipYaw: 0.21, adsY: -0.0555, adsZ: -0.36, kz: 0.03, kr: 0.03 },
+  { id: 'mp40', name: 'MP 40', mag: 32, ammo: 32, reserve: 128, max: 128, dmg: 34, auto: true, fov: 47, hip: [0.27, -0.125, -0.41], hipYaw: 0.21, adsY: -0.0555, adsZ: -0.36, kz: 0.03, kr: 0.03 },
   // index 2 = Stielhandgranate. Each throw uses the grenade in hand (mag 1); the next one is readied from reserve. No sights, no direct damage.
   { id: 'gren', kind: 'grenade', name: 'GRENADE', mag: 1, ammo: 1, reserve: 2, max: 2, dmg: 0, auto: false, fov: 62, hip: [0.2, -0.17, -0.38], hipYaw: 0.1, adsY: -0.17, adsZ: -0.38, kz: 0, kr: 0 },
 ];
@@ -68,6 +68,7 @@ export const WEAPON_DEFS = [
 // Kar98 reload sound: the clip has two sections with a quiet gap between them. The first section (0 to K98_RELOAD_SPLIT_T s of the clip) plays as the bolt is pulled back; the second (from K98_RELOAD_SPLIT_T) plays when the bolt cocks back, K98_RELOAD_COCK_T s into the reload.
 export const K98_RELOAD_SPLIT_T = 0.66;
 export const K98_RELOAD_COCK_T = 1.75;
+export const K98_CLIP_IN_T = 0.75;   // s into the Kar98 reload when the stripper clip goes down into the receiver: the first section plays again here
 
 // thrown grenades: flight, fuse, bounce, and the blast that hurts soldiers and the player
 export const GRENADE = {

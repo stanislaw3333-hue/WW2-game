@@ -7,7 +7,7 @@ import { CLIPS } from './clips.js';
 
 let AC = null, master, echoIn, noiseBuf, radioPanner = null;
 // decoded sample buffers; null until loaded (every sound falls back to its procedural version)
-const BUF = { kar98Shot: null, kar98Reload: null, kar98Rechamber: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, footstep: null, shouts: [], convos: [] };
+const BUF = { kar98Shot: null, kar98Reload: null, kar98Rechamber: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, footstep: null, shouts: [], convos: [], deaths: [] };
 const SIREN_GAIN = 0.3;   // background air siren level under the drone
 const RADIO_GAIN = 1.1;   // German radio set level at its reference distance
 
@@ -52,6 +52,7 @@ function loadClips() {
   load(CLIPS.kar98Rechamber).then(b => { BUF.kar98Rechamber = b; });
   CLIPS.shouts.forEach(u => load(u).then(b => { if (b) BUF.shouts.push(b); }));
   CLIPS.convos.forEach(u => load(u).then(b => { if (b) BUF.convos.push(b); }));
+  CLIPS.deaths.forEach(u => load(u).then(b => { if (b) BUF.deaths.push(b); }));
 }
 // looping air siren sits under the drone as background; it is heard only outdoors (see setSirenOutdoors)
 let sirenGain = null, sirenOutdoors = true;
@@ -234,6 +235,16 @@ export const SFX = {
       return;
     }
     playBuf(id === 'k98' ? BUF.kar98Reload : BUF.mp40Reload, 0.9);
+  },
+  // German soldier killed: half the time one of the death sounds plays (picked at random)
+  death() {
+    if (Math.random() < 0.5 || !BUF.deaths.length) return;
+    playBuf(BUF.deaths[(Math.random() * BUF.deaths.length) | 0], 0.4);
+  },
+  // Kar98 clip going into the receiver: the first section of the reload sample again
+  clipIn() {
+    if (!BUF.kar98Reload) return;
+    playSlice(BUF.kar98Reload, 0.9, 0, Math.min(K98_RELOAD_SPLIT_T, BUF.kar98Reload.duration));
   },
   // Kar98 bolt cycle after each shot: the rechamber sample covers the whole action; without it, the old four clicks play
   bolt() {

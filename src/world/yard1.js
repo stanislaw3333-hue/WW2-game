@@ -109,9 +109,6 @@ export function buildYard1() {
   crate(4.6, 0, -17.6, 1.2, 0, M.crateE); crate(6.1, 0, -18, 1.3, 0.2, M.crateB); crate(5.2, 1.2, -17.8, 1.0, 0.4, M.crateB);
   crate(-5.5, 0, 17.8, 1.1, 0.25);
   addBox(-8, 0, 15.5, 2.0, 0.9, 1.0, M.crateWide, { fit: true, wood: true });   // long wide crate
-  // barrels
-  for (const [x, z] of [[16.3, -18.4], [17.3, -18.1], [18.3, -18.5], [17.0, -17.2], [-18.4, -17.5], [-17.5, -18.4], [18.6, 9.6]])
-    addCyl(x, 0, z, 0.4, 1.05, M.barrel, { wood: true, cr: 0.42 });
   // --- Polish truck, parked against the stable's west wall (long axis along Z)
   placeTruck('polish', 17.3, -8, Math.PI / 2);
 
