@@ -1,8 +1,8 @@
 // Enemy soldiers: procedural bodies with hit boxes, the baked Panzergrenadier models, arm IK, AI, shouting, and combat.
 import * as THREE from 'three';
-import { V3, clamp, lerp, angLerp } from '../core/util.js';
-import { S, say, player, enemies, enemyParts, shootables } from '../core/state.js';
-import { camera, scene, mat } from '../render/renderer.js';
+import { V3, lerp } from '../core/util.js';
+import { enemies, enemyParts } from '../core/state.js';
+import { scene, mat } from '../render/renderer.js';
 import { SM, M } from '../render/materials.js';
 import { addBaked } from '../render/baked.js';
 import { atlasUV } from '../packtex.js';
@@ -10,10 +10,7 @@ import { bodyGeos, headGeos, helmetGeos, capGeos } from '../soldierGeo.js';
 import K98_MODEL from '../models/k98.json';
 import PG_MODEL from '../models/pg.json';
 import PGA_MODEL from '../models/pga.json';
-import { ENEMY } from '../core/config.js';
-import { SFX } from '../audio/audio.js';
-import { resolve } from '../player/collide.js';
-import { gun } from '../weapons/guns.js';
+import { ENEMY, ENEMY_SPAWNS } from '../core/config.js';
 
 const SB = bodyGeos(), SH = headGeos(), SHM = helmetGeos(), SC = capGeos();
 const HEAD_SCALE = 1.2;   // skull and features are enlarged so the head fills the helmet; helmet and cap keep their size
@@ -120,13 +117,7 @@ function addEnemy(x, z, yaw, patrol, officer, look = {}) {
   for (const m of e.parts) m.material = HIT_MAT;
   enemies.push(e); resetEnemy(e);
 }
-const EAST = Math.PI / 2;
-addEnemy(-45.6, 6.4, EAST, null, false, { uni: 0, face: 0 });
-addEnemy(-40.5, -4.2, EAST * 0.6, null, true, { uni: 0, face: 3 });
-addEnemy(-56, -8, EAST, [[-56, -8], [-42, -8]], false, { uni: 1, face: 1 });
-addEnemy(-58, 12.5, EAST * 1.2, null, false, { uni: 0, face: 2 });
-addEnemy(-54, 17.5, EAST, [[-54, 17.5], [-40, 17.5]], true, { uni: 1, face: 0 });
-addEnemy(-59.5, 1, EAST, null, false, { uni: 1, face: 3 });
+for (const d of ENEMY_SPAWNS) addEnemy(d.x, d.z, d.yaw, d.patrol, d.officer, d.look);
 refreshEnemyParts();
 
 // two-bone arm IK in body space: shoulder a.S -> elbow -> hand target H
@@ -160,132 +151,4 @@ export function poseEnemy(e) {
   armIK(e.arms[1], ikR.set(0, 0.0, 0.0).applyMatrix4(e.rifle.matrix));
   armIK(e.arms[0], ikL.set(0, 0.0, 0.2).applyMatrix4(e.rifle.matrix));
   e.head.rotation.set(-e.flinch * 0.3 + lerp(0.02, 0.1, a), lerp(0, -0.12, a), lerp(0, -0.1, a));
-}
-
-const losRay = new THREE.Raycaster(), losA = new V3(), losD = new V3();
-function hasLOS(e) {
-  losA.set(e.x, 1.6, e.z); losD.copy(camera.position).sub(losA);
-  const d = losD.length(); if (d < 0.5) return true;
-  losRay.set(losA, losD.divideScalar(d)); losRay.near = 0.3; losRay.far = d - 0.2;
-  return losRay.intersectObjects(shootables, false).length === 0;
-}
-// German shouts through the browser's speech synthesis (uses a German voice when the system has one).
-// A shared cooldown keeps several soldiers from talking over each other.
-let lastShout = -9;
-function shoutFrom(e, word, prob = 1) {
-  if (!e.alive || Math.random() > prob || S.time - lastShout < 1.2) return;
-  if (!('speechSynthesis' in window)) return;
-  lastShout = S.time;
-  const u = new SpeechSynthesisUtterance(word);
-  u.lang = 'de-DE'; u.pitch = 0.45; u.rate = 0.95; u.volume = 0.9;
-  const v = speechSynthesis.getVoices().find(x => /^de/i.test(x.lang)); if (v) u.voice = v;
-  speechSynthesis.speak(u);
-}
-export function alertEnemy(e, spread = true) {
-  if (!e.alive) return;
-  if (!e.alert) { e.alert = true; e.shootT = 0.7 + Math.random() * 0.8; shoutFrom(e, 'Achtung!'); }
-  if (spread) for (const o of enemies) if (o !== e && !o.alert && Math.hypot(o.x - e.x, o.z - e.z) < ENEMY.alertRadius) alertEnemy(o, false);
-}
-export function hitEnemy(e, part, dmg) {
-  e.hp -= dmg * (part === 'head' ? ENEMY.headMult : part === 'body' ? ENEMY.bodyMult : ENEMY.limbMult);
-  e.flinch = 1; SFX.hit(); alertEnemy(e);
-  if (e.hp > 0) { shoutFrom(e, 'Getroffen!', 0.35); return; }
-  shoutFrom(e, 'Gefallen!', 0.8);
-  e.alive = false; e.fallV = 1.5; e.flash = 0; e.flashM.visible = false; S.kills++; refreshEnemyParts();
-  const all = S.kills >= enemies.length;
-  say(all ? 'COURTYARD SECURED - ALL ENEMIES DOWN' : 'ENEMY DOWN  ' + S.kills + '/' + enemies.length, all ? 5 : 2.5);
-  if (all) SFX.done();
-}
-export function hurtPlayer(d) {
-  player.hp -= d; player.hurt = 1; player.lastHit = S.time; SFX.hurt(); gun.camKick = Math.max(gun.camKick, 0.7);
-  if (player.hp <= 0) { player.hp = 0; S.state = 'dead'; S.deadT = 0; S.fireHeld = S.adsHeld = false; S.messageT = 0; }
-}
-function enemyShoot(e, dist, moving) {
-  e.shootT = 1.9 + Math.random() * 1.3; e.flash = 0.07; e.flashM.rotation.z = Math.random() * 6.28;
-  SFX.eshot(dist);
-  shoutFrom(e, ['Feuer!', 'Halt!', 'Hier!'][(Math.random() * 3) | 0], 0.3);
-  let p = clamp(0.6 - dist * 0.015, 0.12, 0.5);
-  if (player.move > 0.9) p *= 0.7;
-  if (player.crouch > 0.5) p *= 0.75;
-  if (moving) p *= 0.6;
-  if (Math.random() < p) hurtPlayer(7 + Math.random() * 8);
-  else if (Math.random() < 0.6) SFX.whiz();
-}
-// the two courtyards are joined by one archway, so enemies route through it
-const WP_A = { x: -20.4, z: 10.5 }, WP_B = { x: -32.6, z: 10.5 };
-const zoneOf = x => (x > -21 ? 0 : x < -32 ? 2 : 1);
-function navTarget(e) {
-  const ze = zoneOf(e.x), zp = zoneOf(player.x);
-  if (ze === zp) return player;
-  if (ze === 2) return Math.hypot(e.x - WP_B.x, e.z - WP_B.z) > 1.2 ? WP_B : WP_A;
-  if (ze === 0) return Math.hypot(e.x - WP_A.x, e.z - WP_A.z) > 1.2 ? WP_A : WP_B;
-  return zp === 0 ? WP_A : WP_B;
-}
-export function updateEnemies(dt) {
-  const live = S.state === 'play';
-  for (const e of enemies) {
-    const dx = player.x - e.x, dz = player.z - e.z, dist = Math.hypot(dx, dz) || 0.01;
-    if (!e.alive) {
-      if (e.fall < 1.5708) {
-        e.fallV += 9 * dt; e.fall = Math.min(1.5708, e.fall + e.fallV * dt);
-        if (e.fall >= 1.5708 && !e.thud) { e.thud = true; SFX.thud(dist); }
-      }
-      e.body.rotation.x = -e.fall; e.body.position.y = Math.sin(e.fall) * 0.13;
-      if (e.fall < 1.5708) { e.aim = lerp(e.aim, 0, 1 - Math.exp(-dt * 6)); e.mv = lerp(e.mv, 0.5, 1 - Math.exp(-dt * 6)); e.flinch = 0; poseEnemy(e); }
-      continue;
-    }
-    e.losT -= dt;
-    if (e.losT <= 0) {
-      e.losT = 0.18 + Math.random() * 0.12;
-      const had = e.los;
-      e.los = live && dist < ENEMY.sightRange && hasLOS(e);
-      if (e.los && !e.alert) {
-        const facing = (Math.sin(e.yaw) * dx + Math.cos(e.yaw) * dz) / dist;
-        if (dist < 7 || (dist < 28 && facing > 0.1)) alertEnemy(e);
-      }
-      if (e.los && !had) e.shootT = Math.max(e.shootT, 0.6 + Math.random() * 0.7);
-    }
-    let mvx = 0, mvz = 0, speed = 0, face = e.yaw, aim = 0;
-    if (e.alert && live) {
-      if (e.los && dist < e.range) {
-        aim = 1; face = Math.atan2(dx, dz);
-        e.strafeT -= dt;
-        if (e.strafeT <= 0) { e.strafeDir = e.strafeDir ? 0 : (Math.random() < 0.5 ? -1 : 1); e.strafeT = e.strafeDir ? 0.6 + Math.random() * 0.6 : 1.5 + Math.random() * 2.5; }
-        if (dist < 3.5) { mvx = -dx / dist; mvz = -dz / dist; speed = ENEMY.retreatSpeed; }
-        else if (e.strafeDir) { mvx = dz / dist * e.strafeDir; mvz = -dx / dist * e.strafeDir; speed = ENEMY.strafeSpeed; }
-      } else {
-        const t = navTarget(e);
-        let tx = t.x - e.x, tz = t.z - e.z; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
-        if (e.sideT > 0) { e.sideT -= dt; const s = e.sideDir, ax = tx * 0.25 - tz * s, az = tz * 0.25 + tx * s, al = Math.hypot(ax, az); tx = ax / al; tz = az / al; }
-        mvx = tx; mvz = tz; speed = ENEMY.chaseSpeed; aim = e.los ? 0.85 : 0.35;
-        face = e.los ? Math.atan2(dx, dz) : Math.atan2(tx, tz);
-      }
-      if (e.los) { e.shootT -= dt; if (e.shootT <= 0) enemyShoot(e, dist, speed > 2); }
-    } else if (e.patrol) {
-      if (e.waitT > 0) e.waitT -= dt;
-      else {
-        const p = e.patrol[e.pi], tx = p[0] - e.x, tz = p[1] - e.z, tl = Math.hypot(tx, tz);
-        if (tl < 0.4) { e.pi = (e.pi + 1) % e.patrol.length; e.waitT = 1.5 + Math.random() * 2; }
-        else { mvx = tx / tl; mvz = tz / tl; speed = ENEMY.patrolSpeed; face = Math.atan2(tx, tz); }
-      }
-    } else face = e.home.yaw + Math.sin(S.time * 0.4 + e.home.x) * 0.5;
-    let moved = 0;
-    if (speed > 0) {
-      const ox = e.x, oz = e.z;
-      e.x += mvx * speed * dt; e.z += mvz * speed * dt; resolve(e, e);
-      moved = Math.hypot(e.x - ox, e.z - oz) / Math.max(dt, 1e-4);
-      if (speed > 2 && moved < speed * 0.35) { e.stuckT += dt; if (e.stuckT > 0.3 && e.sideT <= 0) { e.sideT = 0.9 + Math.random() * 0.8; e.sideDir = Math.random() < 0.5 ? -1 : 1; e.stuckT = 0; } }
-      else e.stuckT = 0;
-    }
-    e.mv = lerp(e.mv, clamp(moved / 3, 0, 1), 1 - Math.exp(-dt * 10));
-    e.walk += moved * dt * 2.6;
-    e.yaw = angLerp(e.yaw, face, 1 - Math.exp(-dt * 7));
-    e.aim = lerp(e.aim, aim, 1 - Math.exp(-dt * 8));
-    e.flinch = Math.max(0, e.flinch - dt * 4);
-    e.body.rotation.x = -e.flinch * 0.2;
-    poseEnemy(e);
-    e.g.position.set(e.x, 0, e.z); e.g.rotation.y = e.yaw;
-    if (e.flash > 0) e.flash -= dt;
-    e.flashM.visible = e.flash > 0;
-  }
 }

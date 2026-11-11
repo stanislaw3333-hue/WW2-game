@@ -6,7 +6,7 @@ import { scene, camera } from '../render/renderer.js';
 import { M } from '../render/materials.js';
 import { SFX } from '../audio/audio.js';
 import { G, gun, curW } from '../weapons/guns.js';
-import { alertEnemy, hitEnemy } from '../enemies/soldiers.js';
+import { alertEnemy, hitEnemy } from '../enemies/combat.js';
 import { spawnParts, placeDecal } from '../effects/fx.js';
 
 const ray = new THREE.Raycaster(); ray.far = 200;

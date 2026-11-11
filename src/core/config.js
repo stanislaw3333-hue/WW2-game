@@ -25,6 +25,19 @@ export const ENEMY = {
   alertRadius: 24,         // m: being alerted spreads to soldiers this close
 };
 
+// enemy placement. yaw is radians (PI/2 = facing east); patrol = list of [x, z] points or null; look.uni 0 dark | 1 field-grey, look.face 0..3
+const E = Math.PI / 2;
+export const ENEMY_SPAWNS = [
+  { x: -45.6, z: 6.4,  yaw: E,       patrol: null, officer: false, look: { uni: 0, face: 0 } },
+  { x: -40.5, z: -4.2, yaw: E * 0.6, patrol: null, officer: true,  look: { uni: 0, face: 3 } },
+  { x: -56,   z: -8,   yaw: E,       patrol: [[-56, -8], [-42, -8]], officer: false, look: { uni: 1, face: 1 } },
+  { x: -58,   z: 12.5, yaw: E * 1.2, patrol: null, officer: false, look: { uni: 0, face: 2 } },
+  { x: -54,   z: 17.5, yaw: E,       patrol: [[-54, 17.5], [-40, 17.5]], officer: true, look: { uni: 1, face: 0 } },
+  { x: -59.5, z: 1,    yaw: E,       patrol: null, officer: false, look: { uni: 1, face: 3 } },
+];
+// the two courtyards are joined by one archway; enemies route through these points
+export const ARCH_WAYPOINTS = { A: { x: -20.4, z: 10.5 }, B: { x: -32.6, z: 10.5 } };
+
 // weapon table: index 0 = Kar98k, 1 = MP40. dmg per bullet; fov is the zoomed field of view; auto = fires while held.
 // hip/adsY/adsZ are the viewmodel offsets; kz/kr are recoil kick (position/rotation).
 export const WEAPON_DEFS = [

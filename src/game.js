@@ -9,7 +9,7 @@ import { update } from './player/update.js';
 import { updateWorld } from './world/update.js';
 import { drawHUD } from './ui/hud.js';
 import { start } from './session.js';
-import { hurtPlayer } from './enemies/soldiers.js';
+import { hurtPlayer } from './enemies/combat.js';
 import { tryReload } from './player/shooting.js';
 import { WEAPONS, gun } from './weapons/guns.js';
 

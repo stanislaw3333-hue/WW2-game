@@ -6,7 +6,7 @@ import { worldL, gunL } from '../render/renderer.js';
 import { M } from '../render/materials.js';
 import { glows } from './geo.js';
 import { sky } from './level.js';
-import { updateEnemies } from '../enemies/soldiers.js';
+import { updateEnemies } from '../enemies/ai.js';
 import { updateParticles } from '../effects/fx.js';
 import { SFX } from '../audio/audio.js';
 import { gun } from '../weapons/guns.js';
