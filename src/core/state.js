@@ -12,12 +12,13 @@ export const S = {
   hideGunT: false,
   lowW: 320,               // HUD and render buffer width (set by resize)
   mdx: 0, mdy: 0,          // mouse movement since the last update
+  noLock: false,           // browser refused pointer lock (e.g. the built-in pane): mouse look still works without it
   fireHeld: false, firePressed: false, adsHeld: false,
   wantW: -1,               // requested weapon index, -1 = none
 };
 export const say = (m, t = 3) => { S.message = m; S.messageT = t; };
 
-export const player = { x: PLAYER.spawn.x, z: PLAYER.spawn.z, y: 0, vy: 0, yaw: 0, pitch: 0, crouch: 0, bob: 0, move: 0, stepAlt: false, hp: PLAYER.maxHp, hurt: 0, lastHit: -99 };
+export const player = { x: PLAYER.spawn.x, z: PLAYER.spawn.z, y: 0, vy: 0, yaw: PLAYER.spawnYaw, pitch: 0, crouch: 0, bob: 0, move: 0, stepAlt: false, hp: PLAYER.maxHp, hurt: 0, lastHit: -99 };
 export const keys = {};
 export const enemies = [];
 export const enemyParts = [];   // hit boxes of living soldiers (raycast targets)

@@ -75,7 +75,7 @@ function buildGuns() {
   {
     const root = new THREE.Group(); gunScene.add(root); root.visible = false;
     const parts = addBaked(MP40_MODEL, root, { metal, bolt: metal });
-    const bolt = parts[MP40_MODEL.meshes.findIndex(m => m.mat === 'bolt')];   // the left cocking handle, at its rest position in the model
+    const bolt = parts[MP40_MODEL.meshes.findIndex(m => m.mat === 'bolt')];   // the slide (bolt), at its rest position in the model
     const mag = new THREE.Group(); root.add(mag);
     prof([[0.141, -0.05], [0.169, -0.05], [0.173, -0.24], [0.146, -0.24]], 0.023, dark, mag, 0.003);
     const magNew = mag.clone(); root.add(magNew); magNew.visible = false;   // fresh magazine that is inserted during reload
@@ -90,7 +90,7 @@ function buildGuns() {
   {
     const root = new THREE.Group(); gunScene.add(root); root.visible = false;
     const nade = new THREE.Group(); root.add(nade);
-    nade.rotation.x = Math.PI / 2; nade.position.y = -0.17;   // stands upright: head up, the hand grips the handle at f = 0.1
+    nade.rotation.x = Math.PI / 2; nade.position.y = -0.11;   // stands upright: head up, the hand grips the handle at f = 0.1 (raised from -0.17 to sit in the hand)
     const gWood = mat(T.grenadeWood, o), gMetal = mat(T.grenadeMetal, od);   // model pack textures (wood handle, metal canister)
     tube(0.016, 0.02, 0.2, 0, gWood, nade, 8);                       // handle; the hand grips it around f = 0.1
     tube(0.034, 0.2, 0.3, 0, gMetal, nade, 10);                      // canister head, pointing forward

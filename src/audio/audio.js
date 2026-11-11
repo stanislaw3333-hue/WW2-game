@@ -51,11 +51,18 @@ function loadClips() {
   CLIPS.shouts.forEach(u => load(u).then(b => { if (b) BUF.shouts.push(b); }));
   CLIPS.convos.forEach(u => load(u).then(b => { if (b) BUF.convos.push(b); }));
 }
-// looping air siren sits under the drone as background
+// looping air siren sits under the drone as background; it is heard only outdoors (see setSirenOutdoors)
+let sirenGain = null, sirenOutdoors = true;
 function startSiren() {
   const s = AC.createBufferSource(); s.buffer = BUF.siren; s.loop = true;
-  const g = AC.createGain(); g.gain.value = SIREN_GAIN;
-  s.connect(g); g.connect(master); s.start();
+  sirenGain = AC.createGain(); sirenGain.gain.value = sirenOutdoors ? SIREN_GAIN : 0;
+  s.connect(sirenGain); sirenGain.connect(master); s.start();
+}
+// fades the siren out when the player goes indoors and back in outdoors; only acts on a change
+export function setSirenOutdoors(outdoors) {
+  if (outdoors === sirenOutdoors) return;
+  sirenOutdoors = outdoors;
+  if (sirenGain && AC) sirenGain.gain.setTargetAtTime(outdoors ? SIREN_GAIN : 0, AC.currentTime, 0.3);
 }
 // the German radio set loops at its position in the enemy yard; it is heard from wherever the listener stands
 function startRadio() {

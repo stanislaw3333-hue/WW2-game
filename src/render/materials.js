@@ -7,6 +7,8 @@ import { soldierTextures } from '../textures3.js';
 import { mat } from './renderer.js';
 
 export const T = derivedTextures(soldierTextures(packTextures(upgradeTextures(makeTextures()))));
+// the Polish truck's picture is smoothed (linear filter) so its wheels and headlights are not blocky; it is used by that truck only
+T.truckPolish.magFilter = T.truckPolish.minFilter = THREE.LinearFilter;
 // aspect = the picture's width / height as it is laid on the world; worldUV uses it so the pictures are not stretched
 const withAspect = (m, aspect) => { m.userData.aspect = aspect; return m; };
 export const M = {
@@ -20,7 +22,8 @@ export const M = {
   foliage: mat(T.treeA, { side: THREE.DoubleSide }), poplar: mat(T.treeB, { emis: 1, tint: [0.55, 0.6, 0.65], side: THREE.DoubleSide }),
   target: mat(T.target, { side: THREE.DoubleSide }), iron: mat(T.iron), radio: mat(T.radio),
   olive: mat(T.olive), tarp: mat(T.tarp), tire: mat(T.tire), glass: mat(T.glass, { decal: true }),
-  water: mat(T.water, { tint: [1.4, 1.5, 1.7] }), lantern: mat(T.lantern, { emis: 1, tint: [1.15, 1.0, 0.8] }),
+  truck: mat(T.truckPolish, { tint: [1.45, 1.45, 1.4] }),   // the Polish truck's own painted texture (baked UVs), lifted: the camouflage is dark
+  water: mat(T.water, { tint: [0.75, 0.85, 1.0] }), lantern: mat(T.lantern, { emis: 1, tint: [1.15, 1.0, 0.8] }),
   lampOff: mat(T.lampOff, { decal: true }), sign: mat(T.sign, { decal: true, side: THREE.DoubleSide }),
   glow: mat(T.glow, { additive: true, emis: 1, tint: [1.0, 0.62, 0.25], snap: false }),
   hole: mat(T.hole, { decal: true }),

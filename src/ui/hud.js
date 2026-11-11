@@ -10,6 +10,13 @@ export function txt(str, x, y, s = 1, col = '#e8e0c0', shadow = '#000') {
   hud.fillStyle = col; drawText((px, py, sz) => hud.fillRect(px, py, sz, sz), str, x, y, s);
 }
 const ctxt = (str, y, s, col, sh) => txt(str, Math.round((S.lowW - textW(str, s)) / 2), y, s, col, sh);
+// on-screen messages: a small smooth font instead of the blocky pixel font
+function smallCentred(str, y, col) {
+  hud.font = '7px Arial, Helvetica, sans-serif'; hud.textBaseline = 'top';
+  const x = Math.round((S.lowW - hud.measureText(str).width) / 2);
+  hud.fillStyle = 'rgba(0,0,0,0.75)'; hud.fillText(str, x + 1, y + 1);
+  hud.fillStyle = col; hud.fillText(str, x, y);
+}
 export function drawHUD() {
   hud.clearRect(0, 0, S.lowW, LOW_H);
   const W = S.lowW, H = LOW_H;
@@ -56,8 +63,7 @@ export function drawHUD() {
     const ms = String(cw.ammo), mx = bx - 6 - textW(ms, 3);
     txt(ms, mx, by - 3, 3, cw.ammo ? '#e8e0c0' : '#d04030');
   }
-  if (gun.state === 'reload' && !dead) ctxt('RELOADING', H / 2 + 24, 1, '#c8c0a0');
-  if (S.messageT > 0 && !dead) ctxt(S.message, 36, textW(S.message, 2) < W - 24 ? 2 : 1, '#f0e8d0');
+  if (S.messageT > 0 && !dead) smallCentred(S.message, 36, '#f0e8d0');
   if (dead) {
     hud.fillStyle = 'rgba(90,0,0,' + clamp(S.deadT * 0.5, 0, 0.55).toFixed(3) + ')'; hud.fillRect(0, 0, W, H);
     ctxt('YOU WERE KILLED', 84, 3, '#e8d8b0', '#200808');

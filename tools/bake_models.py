@@ -13,8 +13,20 @@ CFG = {
                 drop=["7.92x57", "79257", "79257 5rnd clip", "79257 5rnd clip empty", "bolt", "idk for bolt"],
                 mats={"1wo": "wood", "kar98 marking": "wood"}),
     # parts: objects split out into their own mesh key so the game can move them (the MP40 bolt slides on its own)
+    # only the outside side piece of bolt detail #0 moves (found by its island bounds); the slide, its knob and everything else on the gun stay fixed
     "mp40": dict(length=0.80, rot=-90, muzzle=-1, origin_x=0.137,
-                 drop=["Cube.002", "Cube.004"], mats={}, parts={"Cylinder.002": "bolt"}),
+                 drop=["Cube.002", "Cube.004"], mats={}, parts={},
+                 moving_boxes={"bolt detail #0": [((-0.26, -0.47, 0.43), (-0.05, -0.1565, 0.64))]}),
+    # vehicles: bottom-centre origin, length along X (tools/bake_vehicle.py turns and decimates the source first)
+    # both trucks are scaled uniformly (length sets the size, proportions unchanged)
+    "polish": dict(length=5.3, rot=None, muzzle=None, origin_x=None, drop=["Cube"], mats={"truckbake": "truck"}),
+    "canopy": dict(length=5.6, rot=None, muzzle=None, origin_x=None, drop=[],
+                   mats={"Metal_painted": "paint", "van_paint_2": "paint", "paint2": "paint", "armytruck": "paint",
+                         "canvas": "canvas", "canvaslowres": "canvas",
+                         "tyre texture bake": "tire", "lorrywheel": "tire", "lorrywheel_dusty": "tire",
+                         "wood": "wood", "woodbed": "wood", "planks": "wood", "ASH": "wood",
+                         "Glass": "glass", "dirty_glass": "glass", "dirty windshield": "glass",
+                         "headlight glass": "glass", "mirror": "glass"}),
     "pz1": dict(length=5.4, rot=None, muzzle=None, origin_x=None, drop=[],
                 mats={"gray": "armor", "black": "tire"}),
     "pg": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry",
@@ -102,6 +114,11 @@ for o, eo, me in meshes:
         slot = o.material_slots[tri.material_index] if tri.material_index < len(o.material_slots) else None
         mname = slot.material.name if slot and slot.material else "none"
         key = CFG.get("parts", {}).get(o.name) or CFG["mats"].get(mname, "metal")
+        # an object can move in part only: triangles centred inside a "moving" box go to the moving key, the rest of it stays fixed
+        if o.name in CFG.get("moving_boxes", {}):
+            c = sum((W @ me.vertices[me.loops[li].vertex_index].co for li in tri.loops), Vector((0, 0, 0))) / 3
+            inside = any(all(lo[i] <= c[i] <= hi[i] for i in range(3)) for lo, hi in CFG["moving_boxes"][o.name])
+            key = "bolt" if inside else "metal"
         vs = []
         for li in tri.loops:
             p = W @ me.vertices[me.loops[li].vertex_index].co

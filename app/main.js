@@ -12,6 +12,7 @@ app.whenReady().then(() => {
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.key === 'F11') { win.setFullScreen(!win.isFullScreen()); e.preventDefault(); }
   });
+  win.maximize();   // open filling the screen (a 2K display gives a much larger view than the 1280x720 default)
   win.loadFile(path.join(__dirname, 'index.html'));
   if (process.env.COURTYARD_SMOKE) {
     win.webContents.on('console-message', (_e, level, msg) => { if (level >= 2) console.log('RENDERER-ERR', msg); });

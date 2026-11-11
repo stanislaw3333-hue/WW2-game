@@ -30,6 +30,8 @@ import gunwood from './pack/rifle_stock_wood.png';
 import gunmetal from './pack/gun_metal_dark.png';
 import grenadeMetal from './pack/grenade_metal.png';   // Metal15_col from the grenade model pack: canister head
 import grenadeWood from './pack/grenade_wood.png';     // Wood03_col from the grenade model pack: handle
+import truckPolish from './pack/truck_polish.png';     // the Polish truck's picture (ww2-polish-truck.zip), downsized to 1024
+import explosionSheet from './pack/explosion_sheet.png'; // the explosion smoke from Trial+explosion.blend: 55 frames, 8 across, rendered in Blender (courtyard-assets/models/Effects)
 import skyNight from './pack/sky_night_moon.png';      // City Rooftop Night panorama (courtyard-assets/models/Skybox): buildings removed, moon and stars kept, 2048x1024
 
 const FILES = {
@@ -37,7 +39,7 @@ const FILES = {
   windowLit, windowDark, flagBanner, crateWide, crateA, crateB,
   treeA, treeB, radio, soldierSheet,
   stone, stoneDark, plaster, roof, planks, dirt, doorPanels, flag, crateEagle, poster, gunwood, gunmetal,
-  grenadeMetal, grenadeWood, skyNight,
+  grenadeMetal, grenadeWood, skyNight, truckPolish, explosionSheet,
 };
 export function packTextures(T) {
   const loader = new THREE.TextureLoader();

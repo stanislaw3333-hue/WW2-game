@@ -2,7 +2,8 @@
 // Values are in metres, metres per second, or seconds unless noted. No imports: this file is data only.
 
 export const PLAYER = {
-  spawn: { x: 0, z: 17.2 },
+  spawn: { x: 14.6, z: -8 },   // behind the Polish truck: on the courtyard side of it (truck at x 16.35..18.25, z -8)
+  spawnYaw: Math.PI / 2,       // facing west, into the courtyard, with the truck behind
   maxHp: 100,
   walkSpeed: 3.3,          // m/s
   sprintSpeed: 5.4,        // m/s, forward only, not while crouched or aiming
@@ -17,7 +18,7 @@ export const ENEMY = {
   headMult: 3,             // damage multiplier by hit part
   bodyMult: 1,
   limbMult: 0.75,
-  patrolSpeed: 1.15,       // m/s on a patrol route
+  patrolSpeed: 0.7,        // m/s on a patrol route (a relaxed walk)
   chaseSpeed: 3.0,         // m/s moving to a flank point
   strafeSpeed: 1.5,        // m/s sideways while shooting
   retreatSpeed: 1.6,       // m/s backing off when the player is within 3.5 m
@@ -29,15 +30,22 @@ export const ENEMY = {
 const E = Math.PI / 2;
 // German radio set on top of the crate stack in the enemy yard, among the patrolling soldiers.
 // The chatter loop comes from this point. y is the top of the crate stack (crate at y 1.4, size 1.0).
+// building footprints in metres (x0..x1, z0..z1): the distant air siren fades out while the player is inside one
+export const BUILDINGS = [
+  { x0: -20, x1: 20, z0: -26, z1: -20 },   // manor
+  { x0: 20, x1: 26, z0: -20, z1: 12 },     // stable
+  { x0: -63, x1: -31, z0: -16, z1: -10 },  // barracks in the enemy yard
+];
 export const RADIO = { x: -47.5, y: 1.2, z: 2 };   // bottom of the set: on top of the crate, right of centre of the enemy yard seen from the passage
 export const ENEMY_SPAWNS = [
   // three stand around the radio (RADIO), facing the passage (+x); three patrol across the middle of the yard
   { x: -50.2, z: 0.6,  yaw: E,       patrol: null, officer: false, look: { uni: 0, face: 0 } },
   { x: -48.9, z: -1.7, yaw: E,       patrol: null, officer: false, look: { uni: 0, face: 2 } },
   { x: -50.0, z: 4.2,  yaw: E,       patrol: null, officer: false, look: { uni: 1, face: 0 } },
-  { x: -45.2, z: 0.9,  yaw: E,       patrol: [[-45.2, 0.9], [-38, 0.9]], officer: false, look: { uni: 1, face: 1 } },
-  { x: -46.4, z: -2.4, yaw: E,       patrol: [[-46.4, -2.4], [-38, -2.4]], officer: true,  look: { uni: 1, face: 3 } },
-  { x: -46.2, z: 4.6,  yaw: E,       patrol: [[-46.2, 4.6], [-38, 4.6]], officer: false, look: { uni: 0, face: 1 } },
+  // the three walkers take different, crossing routes so they never walk in step or in parallel
+  { x: -45.2, z: 0.9,  yaw: E,       patrol: [[-45.2, 0.9], [-37, -5.5], [-41, 6.5]], officer: false, look: { uni: 1, face: 1 } },
+  { x: -46.4, z: -2.4, yaw: E,       patrol: [[-46.4, -2.4], [-35.5, 2.5]], officer: true,  look: { uni: 1, face: 3 } },
+  { x: -46.2, z: 4.6,  yaw: E,       patrol: [[-46.2, 4.6], [-40, -7], [-34, 1]], officer: false, look: { uni: 0, face: 1 } },
 ];
 // the two courtyards are joined by one archway; enemies route through these points
 export const ARCH_WAYPOINTS = { A: { x: -20.4, z: 10.5 }, B: { x: -32.6, z: 10.5 } };

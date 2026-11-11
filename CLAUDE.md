@@ -100,6 +100,7 @@ Line numbers are no longer needed for navigation: find things by filename (see t
 - Browser pane gotcha: `requestAnimationFrame` stalls until the pane is screenshotted, so take a screenshot right after navigating and before driving `window.__g`.
 
 ## Workflow rules
+- **Screenshot rule (mandatory):** after every visual change to the game (level, models, textures, lighting, HUD, weapons, effects), run the browser smoke test and post a screenshot that shows the change in the reply. Do this without being asked. Non-visual changes (sound, window settings, logic with no visible effect) need no screenshot, but say so.
 - Make one change at a time; run `npm run check` after each.
 - Commit small with a clear message once `check` passes.
 - Prefer Grep + targeted Read over reading whole files.

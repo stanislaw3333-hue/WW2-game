@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { V3 } from '../core/util.js';
 import { circles, shootables, lightDefs } from '../core/state.js';
+import { placeTruck } from './vehicles.js';
 import { scene, mat } from '../render/renderer.js';
 import { M, T } from '../render/materials.js';
 import { worldUV, addBox, addCyl, quad, tri, wallQuad, win, addArch, addLantern } from './geo.js';
@@ -77,8 +78,9 @@ export function buildYard1() {
   const fz = -3;
   addCyl(0, 0, fz, 3, 0.75, M.stone, { open: true, us: 8, vs: 0.4, cr: 3.05 });
   { const m = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.55, 0.75, 8, 1, true), mat(T.stone, { side: THREE.BackSide })); m.position.set(0, 0.375, fz); scene.add(m); }
-  { const g = new THREE.RingGeometry(2.55, 3, 8, 1); g.rotateX(-Math.PI / 2); g.rotateY(Math.PI / 8); const m = new THREE.Mesh(g, M.stoneDark); m.position.set(0, 0.75, fz); scene.add(m); shootables.push(m); }
-  { const g = new THREE.CircleGeometry(2.55, 8); g.rotateX(-Math.PI / 2); g.rotateY(Math.PI / 8); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 3); const m = new THREE.Mesh(g, M.water); m.position.set(0, 0.5, fz); scene.add(m); shootables.push(m); }
+  { const g = new THREE.RingGeometry(2.55, 3, 8, 1); g.rotateX(-Math.PI / 2); const m = new THREE.Mesh(g, M.stoneDark); m.position.set(0, 0.75, fz); scene.add(m); shootables.push(m); }
+  // water: planar UVs from the x/z position, so the texture runs flat across the surface with no radial seam
+  { const g = new THREE.CircleGeometry(2.55, 8); g.rotateX(-Math.PI / 2); const p = g.attributes.position, uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, p.getX(i) / 2.04 + 0.5, p.getZ(i) / 2.04 + 0.5); const m = new THREE.Mesh(g, M.water); m.position.set(0, 0.5, fz); scene.add(m); shootables.push(m); }
   addCyl(0, 0, fz, 0.45, 1.9, M.stone, { solid: false, us: 2 });
   addCyl(0, 1.9, fz, 0.35, 0.45, M.stoneDark, { solid: false, rTop: 1.2, us: 3 });
   addCyl(0, 2.35, fz, 0.2, 0.5, M.stone, { solid: false, rTop: 0.12 });
@@ -110,6 +112,9 @@ export function buildYard1() {
   // barrels
   for (const [x, z] of [[16.3, -18.4], [17.3, -18.1], [18.3, -18.5], [17.0, -17.2], [-18.4, -17.5], [-17.5, -18.4], [18.6, 9.6]])
     addCyl(x, 0, z, 0.4, 1.05, M.barrel, { wood: true, cr: 0.42 });
+  // --- Polish truck, parked against the stable's west wall (long axis along Z)
+  placeTruck('polish', 17.3, -8, Math.PI / 2);
+
   // --- sign near gate
   addBox(5.6, 0, 18.6, 0.12, 1.9, 0.12, M.planks, { solid: false, wood: true });
   circles.push({ cx: 5.6, cz: 18.6, r: 0.15 });

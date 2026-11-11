@@ -2,11 +2,11 @@
 // damage to soldiers and the player inside the radius, a fireball, an expanding shock ring and debris.
 // Both kinds of object are fixed pools that are recycled, like the bullet decals and debris in fx.js.
 import * as THREE from 'three';
-import { V3, lerp, sstep } from '../core/util.js';
+import { V3 } from '../core/util.js';
 import { S, player, enemies, boxes, circles } from '../core/state.js';
 import { GRENADE } from '../core/config.js';
 import { scene, camera } from '../render/renderer.js';
-import { M } from '../render/materials.js';
+import { M, T } from '../render/materials.js';
 import { SFX } from '../audio/audio.js';
 import { gun } from '../weapons/guns.js';
 import { hitEnemy, hurtPlayer, alertEnemy } from '../enemies/combat.js';
@@ -90,15 +90,18 @@ export function clearGrenades() {
 
 // ---- blast: damage, then the visual pieces
 
-// blast visuals: a fireball and a flat shock ring, three sets in rotation so overlapping blasts do not share one set
-const BLAST_T = 0.6;
-const ballGeo = new THREE.SphereGeometry(1, 10, 8);
-const ringGeo = new THREE.RingGeometry(0.75, 1, 20); ringGeo.rotateX(-Math.PI / 2);
+// blast visuals: a fireball played from the explosion sprite sheet (src/pack/explosion_sheet.png, 55 frames, 8 across, 24 fps).
+// Three sets in rotation so overlapping blasts do not share one set.
+const FRAMES = 55, COLS = 8, ROWS = 7, FPS = 24, SPRITE_T = FRAMES / FPS;   // the fireball plays out its whole sheet
+const BALL = 1.5;                                 // fireball size in multiples of the blast radius
+const fireGeo = new THREE.PlaneGeometry(1, 1);
 const blasts = [];
 for (let i = 0; i < 3; i++) {
-  const ball = new THREE.Mesh(ballGeo, M.glow), ring = new THREE.Mesh(ringGeo, M.dust);
-  ball.visible = ring.visible = false; scene.add(ball); scene.add(ring);
-  blasts.push({ ball, ring, t: -1 });
+  const tex = T.explosionSheet.clone();          // own copy per set: each one shows its own frame
+  tex.repeat.set(1 / COLS, 1 / ROWS); tex.needsUpdate = true;
+  const ball = new THREE.Mesh(fireGeo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.1, depthWrite: false, fog: false }));
+  ball.visible = false; scene.add(ball);
+  blasts.push({ ball, tex, t: -1 });
 }
 let blastI = 0;
 
@@ -124,19 +127,17 @@ function explode(p) {
 }
 function startBlast(p) {
   const b = blasts[blastI++ % blasts.length];
-  b.t = 0; b.ball.visible = b.ring.visible = true;
-  b.ball.position.set(p.x, 0.6, p.z); b.ring.position.set(p.x, GROUND + 0.02, p.z);
+  b.t = 0; b.ball.visible = true;
+  b.ball.position.set(p.x, 0.6, p.z); b.ball.scale.setScalar(R * BALL);
 }
-// grow the fireball, fade it by shrinking, and expand the ring until the blast ends
+// play the fireball's sprite frames (turned to face the camera) and end the blast when the sheet has run out
 function updateBlasts(dt) {
   for (const b of blasts) {
     if (b.t < 0) continue;
     b.t += dt;
-    const k = b.t / BLAST_T;
-    if (k >= 1) { b.t = -1; b.ball.visible = b.ring.visible = false; continue; }
-    const grow = sstep(0, 0.18, k), fade = 1 - k * k;
-    b.ball.scale.setScalar(R * 0.42 * lerp(0.4, 1, grow) * fade);
-    const ring = R * 1.5 * sstep(0, 0.5, k) + 0.3;
-    b.ring.scale.set(ring, 1, ring);
+    if (b.t >= SPRITE_T) { b.t = -1; b.ball.visible = false; continue; }
+    const f = Math.min(FRAMES - 1, Math.floor(b.t * FPS));
+    b.tex.offset.set((f % COLS) / COLS, 1 - (Math.floor(f / COLS) + 1) / ROWS);   // row 0 is the top of the sheet
+    b.ball.quaternion.copy(camera.quaternion);
   }
 }

@@ -45,7 +45,7 @@ export function update(dt) {
   const w = curW();
   gun.t += dt; gun.cool -= dt; gun.heat = Math.max(0, gun.heat - dt * 0.9); gun.boltT = Math.max(0, gun.boltT - dt);
   if (S.wantW >= 0) {
-    if (gun.state === 'idle' && S.wantW !== gun.w) { gun.state = 'switch'; gun.t = 0; gun.next = S.wantW; gun.swapped = false; SFX.click(0, 1200); S.wantW = -1; }
+    if (gun.state === 'idle' && S.wantW !== gun.w) { gun.state = 'switch'; gun.t = 0; gun.next = S.wantW; gun.swapped = false; S.wantW = -1; }
     else if (gun.state !== 'fire') S.wantW = -1;
   }
   const want = S.adsHeld && gun.state !== 'reload' && gun.state !== 'switch' && !sprint && w.kind !== 'grenade';
@@ -53,7 +53,7 @@ export function update(dt) {
   if ((S.firePressed || (w.auto && S.fireHeld)) && gun.state === 'idle' && gun.cool <= 0) {
     if (w.ammo > 0) { if (w.kind === 'grenade') startThrow(); else fire(); }
     else if (w.reserve > 0) tryReload();
-    else if (S.firePressed) { SFX.click(0, 3200); say('OUT OF AMMO - FIND AN AMMO CRATE', 2.5); }
+    else if (S.firePressed) { SFX.click(0, 3200); say('OUT OF AMMO', 2.5); }
   }
   S.firePressed = false;
   // automatic fire sound runs while the trigger is held and the gun can actually fire
@@ -62,7 +62,7 @@ export function update(dt) {
   if (gun.state === 'switch') {
     const t = gun.t;
     low = t < 0.26 ? sstep(0, 0.24, t) : 1 - sstep(0.28, 0.52, t);
-    if (!gun.swapped && t >= 0.26) { gun.swapped = true; gun.w = gun.next; WEAPONS.forEach((x, i) => { x.m.root.visible = i === gun.w; }); SFX.click(0, 1900); }
+    if (!gun.swapped && t >= 0.26) { gun.swapped = true; gun.w = gun.next; WEAPONS.forEach((x, i) => { x.m.root.visible = i === gun.w; }); }
     if (t > 0.52) gun.state = 'idle';
   } else if (gun.state === 'throw') {
     // stielhandgranate: wind back, whip forward, let go at the release frame, then the next grenade is readied from reserve
@@ -122,11 +122,12 @@ export function update(dt) {
   } else if (!cw.auto) {
     gm.bolt.rotation.z = rot * 1.45; gm.bolt.position.z = -0.045 + back * 0.085;
     const hw = gun.state === 'fire' ? sstep(0.18, 0.32, gun.t) - sstep(1.02, 1.18, gun.t) : 0;
-    gm.right.position.set(0.045 * hw, (0.07 + rot * 0.035) * hw, (-0.06 + back * 0.085) * hw);
+    // the right hand moves from its rest grip onto the bolt knob (about 0.05 right, 0.05 up, 0.2 forward of the rest hand) and rides back with the bolt
+    gm.right.position.set(0.046 * hw, (0.049 + rot * 0.035) * hw, (-0.195 + back * 0.085) * hw);
     gm.right.position.y -= press * 0.035;                             // right hand presses the clip in
     gm.clip.visible = clipOn; gm.clip.position.y = clipY;
   } else {
-    gm.bolt.position.z = back * 0.05;   // the baked bolt rests at its model position and slides back on each shot
+    gm.bolt.position.z = back * 0.08;   // the baked bolt (slide) rests at its model position and slides back on each shot
     gm.mag.position.y = -mDrop * 0.35; gm.mag.rotation.x = mDrop * 0.3; gm.mag.visible = !mSwap;
     gm.magNew.visible = mSwap; gm.magNew.position.y = -0.35 + mRise * 0.35;
     gm.left.position.set(0, -mDrop * 0.16, mDrop * 0.03);
@@ -142,8 +143,6 @@ export function update(dt) {
   player.hurt = Math.max(0, player.hurt - dt * 2.2);
   if (player.hp < PLAYER.maxHp && S.time - player.lastHit > PLAYER.regenDelay) player.hp = Math.min(PLAYER.maxHp, player.hp + PLAYER.regenRate * dt);
   // hints as you move between the yards
-  if (S.hintT > 0) { S.hintT -= dt; if (S.hintT <= 0 && S.messageT <= 0) say('THE WEST ARCH LEADS TO THE ENEMY YARD', 5); }
-  if (S.zoneMsg < 1 && player.x < -21.5) { S.zoneMsg = 1; say('ENEMY YARD AHEAD - 1 OR 2 SWITCHES WEAPON', 4); }
   // objective cycle
 
   // camera

@@ -9,6 +9,7 @@ import { addBaked } from '../render/baked.js';
 import { worldUV, addBox, addCyl, quad, wallQuad, win, addArch, addLantern } from './geo.js';
 import { R, crate } from './props.js';
 import { RADIO } from '../core/config.js';
+import { placeTruck } from './vehicles.js';
 
 export function buildYard2() {
   {
@@ -49,7 +50,9 @@ export function buildYard2() {
     win('S', x, -9.95, 1.3, 4.3, 6.1, lit ? M.winLit : M.winDark);
     win('S', x, -9.95, 1.3, 1.5, 3.4, lit ? M.winLit : M.winDark);
   }
-  wallQuad('S', -47, -9.94, 1.5, 0.25, 4.15, M.door, { rot: true });
+  // the same door as the manor's: 2.85 m tall, top third of the picture cut off, lintel above
+  wallQuad('S', -47, -9.94, 1.5, 0.25, 2.85, M.door, { rot: true, vmax: 2 / 3 });
+  addBox(-47, 2.85, -9.85, 2.6, 0.3, 0.4, M.stoneDark, { solid: false, shoot: false });
   // one flag above the barracks door (the door would hide flags either side), the same banner as the manor's
   wallQuad('S', -47, -9.93, 0.9, 4.7, 6.1, M.flagBanner, { rot: true });
   addBox(-47, 0, -9.3, 3.2, 0.25, 1.2, M.stone, { solid: false });
@@ -77,6 +80,8 @@ export function buildYard2() {
     for (const m of addBaked(PZ1_MODEL, tank, { armor: mat(T.gunmetal, { tint: [0.8, 0.82, 0.78] }), tire: M.tire })) shootables.push(m);
     boxes.push({ x0: -56 - 1.4, x1: -56 + 1.4, z0: -2.5 - 2.7, z1: -2.5 + 2.7 });
   }
+  // canopy truck parked in the enemy yard, against the wall at z 20.5
+  placeTruck('canopy', -44, 16.5, 0);
   for (const z of [-6, 2, 9, 17]) wallQuad('E', -69, z, 5, 0, 12 + R() * 4, M.poplar);
   for (const x of [-58, -50, -41, -34]) wallQuad('N', x, 27, 5, 0, 12 + R() * 4, M.poplar);
 }

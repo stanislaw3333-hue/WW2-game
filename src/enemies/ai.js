@@ -46,9 +46,7 @@ export function updateEnemies(dt) {
     if (e.losT <= 0) {
       e.losT = 0.18 + Math.random() * 0.12;
       const had = e.los;
-      // while the player is in the passage, soldiers in the enemy yard cannot see them; they are seen once inside the courtyard
-      const hidden = zoneOf(player.x) === 1 && zoneOf(e.x) !== 1;
-      e.los = live && !hidden && dist < ENEMY.sightRange && hasLOS(e);
+      e.los = live && dist < ENEMY.sightRange && hasLOS(e);
       if (e.los && !e.alert) {
         const facing = (Math.sin(e.yaw) * dx + Math.cos(e.yaw) * dz) / dist;
         if (dist < 7 || (dist < 28 && facing > 0.1)) alertEnemy(e);

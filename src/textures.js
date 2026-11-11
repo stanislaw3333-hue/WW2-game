@@ -332,10 +332,11 @@ export function makeTextures() {
   T.tarp = tex(32, 32, P => { const rr = rng(27); P.fill((x) => { const v = 0.8 + Math.sin(x * 0.8) * 0.12 + rr() * 0.12; return [104 * v, 104 * v, 72 * v]; }); });
   T.tire = tex(16, 16, P => { const rr = rng(28); P.fill((x) => { const v = (x % 4 < 2 ? 0.8 : 1.1) + rr() * 0.1; return [30 * v, 30 * v, 32 * v]; }); });
   T.glass = tex(16, 16, P => P.fill((x, y) => ((x + y) % 11 < 2 ? [70, 86, 110] : [22, 30, 46])));
-  T.water = tex(32, 32, P => {
+  // darker and finer than before: 64 px, deep blue base with faint ripple streaks
+  T.water = tex(64, 64, P => {
     const rr = rng(29);
-    P.fill(() => [18, 34, 62]);
-    for (let k = 0; k < 40; k++) { const x = (rr() * 32) | 0, y = (rr() * 32) | 0, l = 2 + ((rr() * 5) | 0); for (let i = 0; i < l; i++) P.set(x + i, y, 60, 90, 130); }
+    P.fill(() => [10, 19, 34]);
+    for (let k = 0; k < 90; k++) { const x = (rr() * 64) | 0, y = (rr() * 64) | 0, l = 3 + ((rr() * 8) | 0); for (let i = 0; i < l; i++) P.set(x + i, y, 30, 46, 66); }
   });
   T.skin = tex(8, 8, P => { const rr = rng(30); P.fill((x, y) => { const v = 0.9 + rr() * 0.12 - (y > 5 ? 0.15 : 0); return [206 * v, 152 * v, 116 * v]; }); });
   T.sleeve = tex(16, 16, P => { const rr = rng(31); P.fill((x, y) => { const v = 0.85 + rr() * 0.2 + ((x + y * 2) % 5 === 0 ? -0.1 : 0); return [92 * v, 96 * v, 58 * v]; }); });
