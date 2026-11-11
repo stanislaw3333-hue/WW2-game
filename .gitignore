@@ -1,6 +1,6 @@
 node_modules/
 .exe-build/
-.claude/
+.claude/settings.local.json
 dist/
 *.exe
 *.log
