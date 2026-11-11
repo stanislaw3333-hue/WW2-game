@@ -1,0 +1,147 @@
+import bpy, sys, json, base64, math
+from array import array
+from mathutils import Matrix, Vector
+
+# Bakes one .blend into a JSON of base64 Float32 arrays that the game imports directly.
+# Output space matches three.js: muzzle along -Z, +Y up, origin at the receiver (guns)
+# or at the bottom centre (vehicles and soldiers). Units are metres.
+# Soldiers ("pg") can also be posed: both hands go to the carried-rifle grips used by poseEnemy.
+argv = sys.argv[sys.argv.index("--") + 1:]
+out_path, cfg_name = argv[0], argv[1]
+CFG = {
+    "k98": dict(length=1.23, rot=90, muzzle=1, origin_x=-0.337,
+                drop=["7.92x57", "79257", "79257 5rnd clip", "79257 5rnd clip empty", "bolt", "idk for bolt"],
+                mats={"1wo": "wood", "kar98 marking": "wood"}),
+    "mp40": dict(length=0.80, rot=-90, muzzle=-1, origin_x=0.137,
+                 drop=["Cube.002", "Cube.004"], mats={}),
+    "pz1": dict(length=5.4, rot=None, muzzle=None, origin_x=None, drop=[],
+                mats={"gray": "armor", "black": "tire"}),
+    "pg": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry",
+               mats={"Material.003": "uniform", "helmetm42_low": "helmet", "scrimwire_low": "helmet",
+                     "scrimleaves_low": "helmet", "ammopouchesgerman_low": "leather"}),
+    "pga": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="aim",
+                mats={"Material.003": "uniform", "helmetm42_low": "helmet", "scrimwire_low": "helmet",
+                      "scrimleaves_low": "helmet", "ammopouchesgerman_low": "leather"}),
+}[cfg_name]
+
+def evaluated_meshes():
+    dg = bpy.context.evaluated_depsgraph_get()
+    out = []
+    for o in bpy.data.objects:
+        if o.type == 'MESH' and o.name not in CFG["drop"]:
+            eo = o.evaluated_get(dg)
+            out.append((o, eo, eo.to_mesh()))
+    return out
+
+def points(meshes):
+    pts = []
+    for _, eo, me in meshes:
+        for v in me.vertices:
+            pts.append(eo.matrix_world @ v.co)
+    return pts
+
+# ---- rest bounds: fix the scale and origin from the rest pose so posing does not move the model
+rest = points(evaluated_meshes())
+minx, maxx = min(p.x for p in rest), max(p.x for p in rest)
+miny, maxy = min(p.y for p in rest), max(p.y for p in rest)
+minz, maxz = min(p.z for p in rest), max(p.z for p in rest)
+if "height" in CFG:
+    S = CFG["height"] / (maxz - minz)
+    FRAME = (S, (minx + maxx) / 2, (miny + maxy) / 2, minz)  # scale, centre x, centre y, feet z
+
+# ---- pose: IK both hands onto the rifle grips, pole targets keep the elbows out and down
+if CFG.get("pose"):
+    S, cx, cy, fz = FRAME
+    def to_blender(t):   # game body space (three.js axes) -> blender world
+        return Vector((t[0] / S + cx, -t[2] / S + cy, t[1] / S + fz))
+    # rifle grips from src/game.js poseEnemy, in the rifle's own frame: right hand on the rifle origin,
+    # left hand 0.2 m along the rifle's +z. Carried: rifle (0, 1.07, 0.2), Euler(0.45, 0.65, 0).
+    # Shouldered: rifle (-0.085, 1.4, 0.31), Euler(0, 0.05, 0). Euler order is YXZ, as in three.js.
+    if CFG["pose"] == "aim":
+        RIGHT = Vector((-0.085, 1.4, 0.31))
+        rot = Matrix.Rotation(0.05, 3, 'Y')
+    else:
+        RIGHT = Vector((0.0, 1.07, 0.2))
+        rot = Matrix.Rotation(0.65, 3, 'Y') @ Matrix.Rotation(0.45, 3, 'X')
+    LEFT = RIGHT + rot @ Vector((0.0, 0.0, 0.2))
+    arm = bpy.data.objects["Armature"]
+    scn = bpy.context.scene
+    for side, tgt, pole, bone in [("R", RIGHT, (-0.55, 1.2, 0.0), "mixamorig:RightHand"),
+                                  ("L", LEFT, (0.55, 1.2, 0.0), "mixamorig:LeftHand")]:
+        t = bpy.data.objects.new("tgt" + side, None); scn.collection.objects.link(t)
+        t.location = to_blender(tgt); t.empty_display_size = 0.05
+        p = bpy.data.objects.new("pole" + side, None); scn.collection.objects.link(p)
+        p.location = to_blender(pole); p.empty_display_size = 0.05
+        c = arm.pose.bones[bone].constraints.new('IK')
+        c.target = t; c.chain_count = 2; c.pole_target = p; c.pole_angle = 0.0
+        c.use_tail = True
+    bpy.context.view_layer.update()
+    print("POSED", "R", tuple(round(x, 3) for x in to_blender(RIGHT)), "L", tuple(round(x, 3) for x in to_blender(LEFT)))
+
+# ---- gather world-space triangles with material key, normal and uv (posed, evaluated)
+meshes = evaluated_meshes()
+tris = []
+for o, eo, me in meshes:
+    me.calc_loop_triangles()
+    W = eo.matrix_world
+    W3 = W.to_3x3()
+    uvl = me.uv_layers.active.data if me.uv_layers.active else None
+    cn = me.corner_normals if hasattr(me, "corner_normals") else None
+    for tri in me.loop_triangles:
+        slot = o.material_slots[tri.material_index] if tri.material_index < len(o.material_slots) else None
+        mname = slot.material.name if slot and slot.material else "none"
+        key = CFG["mats"].get(mname, "metal")
+        vs = []
+        for li in tri.loops:
+            p = W @ me.vertices[me.loops[li].vertex_index].co
+            n = (W3 @ (cn[li].vector if cn is not None else tri.normal)).normalized()
+            uv = uvl[li].uv if uvl else (0.0, 0.0)
+            vs.append((p, n, uv))
+        tris.append((key, vs))
+
+pts = [v[0] for _, vs in tris for v in vs]
+minx, maxx = min(p.x for p in pts), max(p.x for p in pts)
+miny, maxy = min(p.y for p in pts), max(p.y for p in pts)
+minz = min(p.z for p in pts)
+length = maxx - minx
+
+# ---- transform: scale to metres, then place the origin, then orient
+if "height" in CFG:
+    S, cx, cy, fz = FRAME
+    G = Matrix.Scale(S, 4) @ Matrix.Translation(-Vector((cx, cy, fz)))
+elif CFG["rot"] is None:
+    o_pt = Vector(((minx + maxx) / 2, (miny + maxy) / 2, minz))   # bottom centre
+    G = Matrix.Scale(CFG["length"] / length, 4) @ Matrix.Translation(-o_pt)
+else:
+    sign = CFG["muzzle"]
+    muzzle_x = maxx if sign > 0 else minx
+    band = [p for p in pts if abs(p.x - muzzle_x) < 0.6]
+    oz = sum(p.z for p in band) / len(band)                       # barrel axis height
+    o_pt = Vector((CFG["origin_x"], 0.0, oz))
+    R = Matrix.Rotation(math.radians(CFG["rot"]), 4, 'Z')
+    G = Matrix.Scale(CFG["length"] / length, 4) @ R @ Matrix.Translation(-o_pt)
+G3 = G.to_3x3()
+
+# ---- bucket by material; blender (x, y, z) -> three (x, z, -y)
+groups = {}
+def conv(v):
+    return (v.x, v.z, -v.y)
+for key, vs in tris:
+    P, N, U = groups.setdefault(key, (array('f'), array('f'), array('f')))
+    for p, n, uv in vs:
+        q = conv(G @ p); m = conv((G3 @ n).normalized())
+        P.extend(q); N.extend(m); U.extend((uv[0], uv[1]))
+
+def b64(a):
+    return base64.b64encode(a.tobytes()).decode("ascii")
+
+data = {"meshes": [{"mat": k, "count": len(P) // 3, "pos": b64(P), "nrm": b64(N), "uv": b64(U)}
+                   for k, (P, N, U) in groups.items()]}
+with open(out_path, "w") as f:
+    json.dump(data, f)
+
+allq = [conv(G @ p) for _, vs in tris for p, _, _ in vs]
+for i, ax in enumerate("xyz"):
+    print("BBOX3", ax, round(min(q[i] for q in allq), 4), round(max(q[i] for q in allq), 4))
+print("MESHES", {k: len(v[0]) // 3 for k, v in groups.items()})
+print("DONE", out_path)
