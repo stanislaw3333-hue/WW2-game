@@ -10,6 +10,5 @@ Set up a development session for Courtyard 1944 so the user can test and develop
 3. Start the static server with `npm run serve` in the background (run_in_background). It serves `app/` on http://localhost:8080 and must keep running. If port 8080 is already in use, the server is already running; continue.
 4. Open `http://localhost:8080/index.html?test` in the built-in browser with `preview_start` (url).
 5. Show the browser pane beside the conversation with `mcp__ccd_view__show_pane` (pane `preview`) so the game is visible under the change tracker, and show the artifact pane (pane `artifact`).
-6. Take one screenshot of the game and confirm the scene renders.
 
-Report only: the build result, that the server is running on http://localhost:8080, that the change tracker and the game are open, and any console errors. Do not make code changes in this command.
+Only open the windows. Do not take screenshots, run the smoke test, drive the game or check the console. Report only: the build result, that the server is running on http://localhost:8080, and that the change tracker and the game are open. Do not make code changes in this command.
