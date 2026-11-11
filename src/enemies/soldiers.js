@@ -4,14 +4,20 @@ import { V3, lerp } from '../core/util.js';
 import { enemies, enemyParts } from '../core/state.js';
 import { scene, mat } from '../render/renderer.js';
 import { SM, M } from '../render/materials.js';
-import { addBaked } from '../render/baked.js';
+import { addBaked, bakedGeo } from '../render/baked.js';
 import { atlasUV } from '../packtex.js';
 import { bodyGeos, headGeos, helmetGeos, capGeos } from '../soldierGeo.js';
 import K98_MODEL from '../models/k98.json';
 import PG_MODEL from '../models/pg.json';
 import PGA_MODEL from '../models/pga.json';
+import GS_MODEL from '../models/gs.json';
+import GSA_MODEL from '../models/gsa.json';
 import { ENEMY, ENEMY_SPAWNS } from '../core/config.js';
 
+// the visible enemy body: the German soldier FBX (gs / gsa, carried and aimed). Set true to go back to the
+// Panzergrenadier (pg / pga), kept for later. Both bodies use the same uniform UV remap onto the soldier sheet.
+const USE_PANZER = false;
+const CARRY_MODEL = USE_PANZER ? PG_MODEL : GS_MODEL, AIM_MODEL = USE_PANZER ? PGA_MODEL : GSA_MODEL;
 const SB = bodyGeos(), SH = headGeos(), SHM = helmetGeos(), SC = capGeos();
 const HEAD_SCALE = 1.2;   // skull and features are enlarged so the head fills the helmet; helmet and cap keep their size
 // uniform details: left-arm band (a cylinder arc around the sleeve) and officer shoulder boards
@@ -32,10 +38,34 @@ function armbandMat() {
   ARMBAND_MAT = mat(tex, { affine: 0, emis: 0.16 });
   return ARMBAND_MAT;
 }
-// jacket and sleeves are laid out on the pack's soldier atlas (torso centre, arms out to each side)
-atlasUV(SB.jacket, 0.30, 0.70, 0.02, 0.98);
-// skull: the face part of the pack's head map (eyes, nose and mouth sit in the upper-middle of the sheet)
-for (const k of ['shoulder', 'upper', 'fore']) if (SB[k]) atlasUV(SB[k], 0.02, 0.28, 0.25, 0.75);
+// the visible soldier is the baked Panzergrenadier (uniform material), so its UVs are remapped onto the soldier sheet.
+// Torso front -> tunic (left part of the sheet). Torso back -> the grey belted panel (right part), with its belt band
+// at the front belt height. Arms and legs -> the grey panel, wrapped around each limb.
+// The procedural jacket and sleeves (SB) are hit boxes only, drawn invisible, so they keep the plain atlas cut.
+const clampTo = (a, lo, hi) => Math.min(hi, Math.max(lo, a));
+function bakedUniformUV(geo) {
+  const p = geo.attributes.position, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    if (y > 1.3 && Math.abs(x) > 0.2) {                             // shoulder pads: the tunic's top (collar tabs, shoulder straps) stretched over them
+      uv.setXY(i, clampTo(0.29 + (x / 0.25) * 0.29, 0, 0.58), 0.736 + 0.264 * clampTo((y - 1.3) / 0.25, 0, 1));
+      continue;
+    }
+    if (y > 0.92 && y < 1.52 && Math.abs(x) < 0.27) {
+      const v = (y - 0.92) / 0.6;                                   // 0 hem .. 1 collar
+      if (z > 0) { uv.setXY(i, clampTo(0.29 + (x / 0.25) * 0.29, 0, 0.58), 0.28 + v * 0.72); continue; }
+      const row = clampTo(691 - 737 * v, 310, 760);                 // panel rows; the band at row ~470 is at v 0.3
+      uv.setXY(i, 0.785 + 0.205 * clampTo(x / 0.25, -1, 1), 1 - row / 1024);
+      continue;
+    }
+    const a = (Math.atan2(x, z) + Math.PI) / (2 * Math.PI);        // around the limb
+    uv.setXY(i, 0.58 + 0.41 * a, 0.26 + 0.31 * clampTo(y / 1.76, 0, 1));
+  }
+  uv.needsUpdate = true;
+}
+for (const m of [...CARRY_MODEL.meshes, ...AIM_MODEL.meshes]) if (m.mat === 'uniform') bakedUniformUV(bakedGeo(m));
+atlasUV(SB.jacket, 0.0, 0.58, 0.28, 1.0);
+for (const k of ['shoulder', 'upper', 'fore']) if (SB[k]) atlasUV(SB[k], 0.58, 0.99, 0.26, 0.57);
 const SG = {};
 SG.flash = new THREE.PlaneGeometry(0.5, 0.5);
 
@@ -83,6 +113,7 @@ function addEnemy(x, z, yaw, patrol, officer, look = {}) {
   const head = grp(body, 0, 1.645, 0); e.head = head;
   const face = grp(head, 0, 0, 0); face.scale.setScalar(HEAD_SCALE);
   mk(SH.skull, SM.shadow, face, 'head'); mk(SH.features, SM.shadow, face, 'head');
+  // the helmet's shadow: a shell just outside the baked head, drawn on top of its upper half (not a hit box)
   if (officer) {
     const cap = grp(head, 0, 0.056, -0.008); cap.rotation.x = 0.02;
     mk(SC.band, SM.band, cap, 'head'); mk(SC.crown, SM.cap, cap, 'head'); mk(SC.piping, SM.metal, cap, 'head');
@@ -111,8 +142,8 @@ function addEnemy(x, z, yaw, patrol, officer, look = {}) {
   // visible body: the Panzergrenadier in two baked poses, carried and shouldered (poseEnemy swaps them);
   // the procedural parts above only take hits
   const bodyMats = { uniform: U.tunic, helmet: SM.stahl, leather: SM.leather };
-  e.carryBody = addBaked(PG_MODEL, body, bodyMats);
-  e.aimBody = addBaked(PGA_MODEL, body, bodyMats);
+  e.carryBody = addBaked(CARRY_MODEL, body, bodyMats);
+  e.aimBody = addBaked(AIM_MODEL, body, bodyMats);
   for (const m of e.aimBody) m.visible = false;
   for (const m of e.parts) m.material = HIT_MAT;
   enemies.push(e); resetEnemy(e);
@@ -145,7 +176,7 @@ export function poseEnemy(e) {
   const shouldered = a > 0.5;
   for (const m of e.carryBody) m.visible = !shouldered;
   for (const m of e.aimBody) m.visible = shouldered;
-  if (shouldered) { e.rifle.position.set(-0.085, 1.4, 0.31); e.rifle.rotation.set(0, 0.05, 0); }
+  if (shouldered) { e.rifle.position.set(-0.085, 1.5, 0.25); e.rifle.rotation.set(0, 0.05, 0); }
   else { e.rifle.position.set(0, 1.07, 0.2); e.rifle.rotation.set(0.45, 0.65, 0); }
   e.rifle.updateMatrix();
   armIK(e.arms[1], ikR.set(0, 0.0, 0.0).applyMatrix4(e.rifle.matrix));

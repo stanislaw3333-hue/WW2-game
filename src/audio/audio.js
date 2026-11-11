@@ -1,7 +1,15 @@
-// Web Audio: procedural sound effects (noise and tone bursts) and the ambient drone. Nothing is loaded from files.
+// Web Audio: sampled weapon/shout/siren clips (decoded from src/audio/clips.js) with procedural fallbacks,
+// the procedural sound effects (noise and tone bursts) and the ambient drone.
+import * as THREE from 'three';
 import { clamp } from '../core/util.js';
+import { RADIO } from '../core/config.js';
+import { CLIPS } from './clips.js';
 
-let AC = null, master, echoIn, noiseBuf;
+let AC = null, master, echoIn, noiseBuf, radioPanner = null;
+// decoded sample buffers; null until loaded (every sound falls back to its procedural version)
+const BUF = { kar98Shot: null, kar98Reload: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, shouts: [], convos: [] };
+const SIREN_GAIN = 0.3;   // background air siren level under the drone
+const RADIO_GAIN = 1.1;   // German radio set level at its reference distance
 
 // call from a user gesture: creates the context on first use and resumes it if the browser suspended it
 export function startAudio() {
@@ -27,7 +35,118 @@ function initAudio() {
     lfo.connect(lg); lg.connect(wg.gain); lfo.start();
     w.connect(wl); wl.connect(wg); wg.connect(master); w.start();
     startDrone();
+    loadClips();
   } catch (e) { AC = null; }
+}
+// decodes every sample clip once; each one is independent, so a failed clip only disables its own sound
+function loadClips() {
+  const load = url => fetch(url).then(r => r.arrayBuffer()).then(b => AC.decodeAudioData(b)).catch(() => null);
+  load(CLIPS.kar98Shot).then(b => { BUF.kar98Shot = b; });
+  load(CLIPS.kar98Reload).then(b => { BUF.kar98Reload = b; });
+  load(CLIPS.mp40Shot).then(b => { BUF.mp40Shot = b; });
+  load(CLIPS.mp40Reload).then(b => { BUF.mp40Reload = b; });
+  load(CLIPS.siren).then(b => { if (!b) return; BUF.siren = b; startSiren(); });
+  load(CLIPS.radio).then(b => { if (!b) return; BUF.radio = b; startRadio(); });
+  load(CLIPS.grenade).then(b => { BUF.grenade = b; });
+  CLIPS.shouts.forEach(u => load(u).then(b => { if (b) BUF.shouts.push(b); }));
+  CLIPS.convos.forEach(u => load(u).then(b => { if (b) BUF.convos.push(b); }));
+}
+// looping air siren sits under the drone as background
+function startSiren() {
+  const s = AC.createBufferSource(); s.buffer = BUF.siren; s.loop = true;
+  const g = AC.createGain(); g.gain.value = SIREN_GAIN;
+  s.connect(g); g.connect(master); s.start();
+}
+// the German radio set loops at its position in the enemy yard; it is heard from wherever the listener stands
+function startRadio() {
+  const s = AC.createBufferSource(); s.buffer = BUF.radio; s.loop = true;
+  radioPanner = AC.createPanner();
+  radioPanner.panningModel = 'HRTF'; radioPanner.distanceModel = 'inverse';
+  radioPanner.refDistance = 2; radioPanner.maxDistance = 60; radioPanner.rolloffFactor = 1.3;
+  radioPanner.positionX.value = RADIO.x; radioPanner.positionY.value = RADIO.y + 0.2; radioPanner.positionZ.value = RADIO.z;
+  const g = AC.createGain(); g.gain.value = RADIO_GAIN;
+  s.connect(radioPanner); radioPanner.connect(g); g.connect(master); s.start();
+}
+// keeps the audio listener on the camera each frame so the radio pans and fades with the player's view
+const fwd = new THREE.Vector3();
+export function setListener(camera) {
+  if (!AC) return;
+  const L = AC.listener, p = camera.position;
+  camera.updateMatrixWorld();
+  camera.getWorldDirection(fwd);
+  if (L.positionX) {
+    L.positionX.value = p.x; L.positionY.value = p.y; L.positionZ.value = p.z;
+    L.forwardX.value = fwd.x; L.forwardY.value = fwd.y; L.forwardZ.value = fwd.z;
+    L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
+  } else {
+    L.setPosition(p.x, p.y, p.z); L.setOrientation(fwd.x, fwd.y, fwd.z, 0, 1, 0);
+  }
+}
+// plays a decoded clip; returns false when the clip is not loaded so the caller can fall back
+function playBuf(buf, gain, rate = 1) {
+  if (!AC || !buf) return false;
+  const s = AC.createBufferSource(), g = AC.createGain();
+  s.buffer = buf; s.playbackRate.value = rate; g.gain.value = gain;
+  s.connect(g); g.connect(master); s.start();
+  return true;
+}
+// one spoken line from a German soldier `dist` metres away: quiet when far, louder as he comes closer.
+// Returns the source node (so combat can cut it off) and the line's length in seconds, or null if no audio.
+export function playConvoLine(dist) {
+  if (!AC || !BUF.convos.length) return null;
+  const buf = BUF.convos[(Math.random() * BUF.convos.length) | 0];
+  const s = AC.createBufferSource(), g = AC.createGain();
+  s.buffer = buf; g.gain.value = clamp(0.8 / (1 + dist * 0.35), 0, 0.8);
+  s.connect(g); g.connect(master); s.start();
+  return { node: s, length: buf.duration };
+}
+export function stopNodes(nodes) { if (!AC) return; nodes.forEach(s => { try { s.stop(); } catch { /* already finished */ } }); }
+// continuous automatic fire: the MP40 burst sample is chained back to back while the trigger is held,
+// and cuts off as soon as firing stops. Returns false when the sample is not loaded (caller falls back to per-shot sound).
+let fireBus = null, fireOn = false, fireNext = 0, fireNodes = [];
+export function autoFireReady() { return !!(AC && BUF.mp40Shot); }
+export function setAutoFire(on) {
+  if (!autoFireReady()) return;
+  const now = AC.currentTime;
+  if (!fireBus) { fireBus = AC.createGain(); fireBus.gain.value = 0; fireBus.connect(master); }
+  if (on && !fireOn) { fireOn = true; fireNext = now; fireBus.gain.cancelScheduledValues(now); fireBus.gain.setValueAtTime(1, now); }
+  if (!on && fireOn) {
+    fireOn = false;
+    fireBus.gain.cancelScheduledValues(now); fireBus.gain.setTargetAtTime(0, now, 0.02);
+    stopNodes(fireNodes); fireNodes = [];
+    return;
+  }
+  if (!on) return;
+  fireNodes = fireNodes.filter(n => n.end > now);
+  if (fireNext < now) fireNext = now + 0.01;   // never schedule a burst in the past: that would leave a gap
+  const fb = trimmedFire();
+  while (fireNext < now + 0.25) {   // keep about a quarter second of bursts queued ahead
+    const s = AC.createBufferSource(); s.buffer = fb;   // same rate for every burst, so the bursts join with no pitch step
+    s.connect(fireBus); s.start(fireNext);
+    s.end = fireNext + fb.duration;
+    fireNodes.push(s);
+    fireNext = s.end;
+  }
+}
+// the MP40 burst with the decoder's silent padding cut from both ends (the mp3 adds a few ms of silence at each
+// end, which showed as a break between chained bursts). Built once from the decoded sample.
+let fireSrc = null, fireTrim = null;
+function trimmedFire() {
+  if (fireSrc === BUF.mp40Shot) return fireTrim;
+  fireSrc = BUF.mp40Shot;
+  const b = fireSrc, n = b.length, chans = [];
+  for (let c = 0; c < b.numberOfChannels; c++) chans.push(b.getChannelData(c));
+  const loud = i => chans.some(d => Math.abs(d[i]) > 0.002);
+  const attack = i => chans.some(d => Math.abs(d[i]) > 0.2);
+  // start 2 ms before the first real shot: the sample opens with ~40 ms of near-silence, which was the pause
+  let a = 0, z = n - 1;
+  while (a < n - 1 && !attack(a)) a++;
+  a = Math.max(0, a - 88);
+  while (z > a && !loud(z)) z--;
+  const out = AC.createBuffer(chans.length, z - a + 1, b.sampleRate);
+  chans.forEach((d, c) => out.copyToChannel(d.subarray(a, z + 1), c));
+  fireTrim = out;
+  return out;
 }
 // sinister ambient drone: detuned low voices with a dissonant minor second, a slowly swelling filter,
 // a distant drifting wail, a dark echo, and occasional low stings
@@ -82,7 +201,19 @@ function sfxTone(f0, f1, dur, gain, type = 'sine', delay = 0) {
 }
 
 export const SFX = {
-  shot() { sfxNoise({ f0: 5200, f1: 300, dur: 0.5, gain: 1.0, echo: 0.6 }); sfxNoise({ type: 'highpass', f0: 2500, dur: 0.07, gain: 0.5 }); sfxTone(170, 38, 0.24, 0.9); },
+  shot() {
+    if (playBuf(BUF.kar98Shot, 0.9, 0.98 + Math.random() * 0.04)) return;
+    sfxNoise({ f0: 5200, f1: 300, dur: 0.5, gain: 1.0, echo: 0.6 }); sfxNoise({ type: 'highpass', f0: 2500, dur: 0.07, gain: 0.5 }); sfxTone(170, 38, 0.24, 0.9);
+  },
+  autoFire: on => setAutoFire(on),
+  autoFireReady: () => autoFireReady(),
+  // reload sample for a weapon id ('k98' or 'mp40'); the animation keeps its own timing for the ammo refill
+  reload(id) { playBuf(id === 'k98' ? BUF.kar98Reload : BUF.mp40Reload, 0.9); },
+  // German callout from a random sample clip, quieter with distance; false if no clip is loaded yet
+  shout(dist) {
+    if (!BUF.shouts.length) return false;
+    return playBuf(BUF.shouts[(Math.random() * BUF.shouts.length) | 0], clamp(0.9 / (1 + dist * 0.12), 0.12, 0.9));
+  },
   click(d = 0, f = 2600) { sfxNoise({ type: 'bandpass', f0: f, q: 3, dur: 0.05, gain: 0.45, delay: d }); sfxTone(f * 0.4, f * 0.2, 0.03, 0.12, 'square', d); },
   step(alt) { sfxNoise({ f0: alt ? 420 : 340, f1: 120, dur: 0.11, gain: 0.26 }); sfxNoise({ type: 'bandpass', f0: 1800, q: 1, dur: 0.035, gain: 0.05 }); },
   wood() { sfxNoise({ type: 'bandpass', f0: 520, q: 2.5, dur: 0.14, gain: 0.7, echo: 0.2 }); sfxTone(240, 110, 0.1, 0.3, 'triangle'); },
@@ -94,10 +225,22 @@ export const SFX = {
     [[55, 0.5], [41.2, 0.4], [36.7, 0.35]].forEach(([f, g], i) => { sfxTone(f, f * 0.96, 3.2, g * 0.35, 'triangle', i * 0.22); sfxTone(f * 0.5, f * 0.48, 3.8, g * 0.6, 'sine', i * 0.22); });
     sfxNoise({ f0: 140, f1: 40, dur: 3.0, gain: 0.35, attack: 0.3 });
   },
-  smg() { sfxNoise({ f0: 4200, f1: 480, dur: 0.17, gain: 0.72, echo: 0.3 }); sfxNoise({ type: 'highpass', f0: 3000, dur: 0.04, gain: 0.3 }); sfxTone(210, 70, 0.09, 0.5); },
+  smg() {
+    if (playBuf(BUF.mp40Shot, 0.9, 0.98 + Math.random() * 0.04)) return;
+    sfxNoise({ f0: 4200, f1: 480, dur: 0.17, gain: 0.72, echo: 0.3 }); sfxNoise({ type: 'highpass', f0: 3000, dur: 0.04, gain: 0.3 }); sfxTone(210, 70, 0.09, 0.5);
+  },
   eshot(dist) { const g = clamp(1.1 / (1 + dist * 0.09), 0.12, 0.8); sfxNoise({ f0: 3600, f1: 260, dur: 0.4, gain: g, echo: 0.5 }); sfxTone(150, 40, 0.2, g * 0.7); },
   hit() { sfxNoise({ type: 'bandpass', f0: 700, q: 1.5, dur: 0.09, gain: 0.5 }); },
   hurt() { sfxNoise({ f0: 300, f1: 80, dur: 0.18, gain: 0.8 }); sfxTone(110, 50, 0.2, 0.5, 'triangle'); },
   whiz() { sfxTone(2400, 900, 0.12, 0.07, 'sawtooth'); },
   thud(dist) { sfxNoise({ f0: 220, f1: 60, dur: 0.22, gain: clamp(0.7 / (1 + dist * 0.08), 0.08, 0.5) }); },
+  // arm swinging through: a short rising air whoosh
+  grenadeThrow() { sfxNoise({ type: 'bandpass', f0: 400, f1: 1600, q: 1.2, dur: 0.28, gain: 0.35, attack: 0.05 }); },
+  // detonation: the recorded blast when loaded, else a low noise crack with a falling body
+  explode(dist) {
+    const g = clamp(1.2 / (1 + dist * 0.1), 0.15, 1);
+    if (playBuf(BUF.grenade, g, 0.97 + Math.random() * 0.06)) return;
+    sfxNoise({ f0: 1200, f1: 50, dur: 1.1, gain: g, echo: 0.3 }); sfxNoise({ type: 'highpass', f0: 1800, dur: 0.12, gain: 0.5 });
+    sfxTone(120, 30, 0.9, g * 0.8);
+  },
 };

@@ -1,18 +1,21 @@
 // Enemy combat: shouts, alerting, damage taken by enemies, damage dealt to the player, enemy gunfire.
 import { clamp } from '../core/util.js';
-import { S, say, player, enemies } from '../core/state.js';
+import { S, player, enemies } from '../core/state.js';
 import { ENEMY } from '../core/config.js';
 import { SFX } from '../audio/audio.js';
 import { gun } from '../weapons/guns.js';
 import { refreshEnemyParts } from './soldiers.js';
+import { stopConversation } from './chatter.js';
 
-// German shouts through the browser's speech synthesis (uses a German voice when the system has one).
-// A shared cooldown keeps several soldiers from talking over each other.
+// German callouts: a random clip from the sampled shout pool, or the browser's speech synthesis
+// (German voice when the system has one) if the clips are not loaded. A shared cooldown keeps
+// several soldiers from talking over each other. The word is only used by the speech fallback.
 let lastShout = -9;
 export function shoutFrom(e, word, prob = 1) {
   if (!e.alive || Math.random() > prob || S.time - lastShout < 1.2) return;
-  if (!('speechSynthesis' in window)) return;
   lastShout = S.time;
+  if (SFX.shout(Math.hypot(e.x - player.x, e.z - player.z))) return;
+  if (!('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(word);
   u.lang = 'de-DE'; u.pitch = 0.45; u.rate = 0.95; u.volume = 0.9;
   const v = speechSynthesis.getVoices().find(x => /^de/i.test(x.lang)); if (v) u.voice = v;
@@ -20,7 +23,7 @@ export function shoutFrom(e, word, prob = 1) {
 }
 export function alertEnemy(e, spread = true) {
   if (!e.alive) return;
-  if (!e.alert) { e.alert = true; e.shootT = 0.7 + Math.random() * 0.8; shoutFrom(e, 'Achtung!'); }
+  if (!e.alert) { e.alert = true; e.shootT = 0.7 + Math.random() * 0.8; stopConversation(); shoutFrom(e, 'Achtung!'); }
   if (spread) for (const o of enemies) if (o !== e && !o.alert && Math.hypot(o.x - e.x, o.z - e.z) < ENEMY.alertRadius) alertEnemy(o, false);
 }
 export function hitEnemy(e, part, dmg) {
@@ -30,7 +33,6 @@ export function hitEnemy(e, part, dmg) {
   shoutFrom(e, 'Gefallen!', 0.8);
   e.alive = false; e.fallV = 1.5; e.flash = 0; e.flashM.visible = false; S.kills++; refreshEnemyParts();
   const all = S.kills >= enemies.length;
-  say(all ? 'COURTYARD SECURED - ALL ENEMIES DOWN' : 'ENEMY DOWN  ' + S.kills + '/' + enemies.length, all ? 5 : 2.5);
   if (all) SFX.done();
 }
 export function hurtPlayer(d) {

@@ -1,26 +1,44 @@
 // Textures taken from the user's own copy of the Frontline HD texture pack (personal use only).
+// Files live in src/pack/ (git-ignored). Each name says what the picture is, not where it came from;
+// the key on the right is what materials.js uses. The source name is in the comment for reference.
 import * as THREE from 'three';
-import stone from './pack/stone.png';
-import stoneDark from './pack/stoneDark.png';
-import plaster from './pack/plaster.png';
-import cobble from './pack/cobble.png';
-import roof from './pack/roof.png';
-import planks from './pack/planks.png';
-import crate from './pack/crate.png';
-import dirt from './pack/dirt.png';
-import door from './pack/door.png';
-import flag from './pack/flag.png';
-import crateEagle from './pack/crateEagle.png';
-import poster from './pack/poster.png';
-import gunwood from './pack/gunwood.png';
-import gunmetal from './pack/gunmetal.png';
-import eagle from './pack/eagle.png';
-import atlasGrey from './pack/atlasGrey.png';
-import atlasSepia from './pack/atlasSepia.png';
-import face768 from './pack/face768.png';
-import face758 from './pack/face758.png';
+import windowLit from './pack/window_lit.png';          // tex1_128x256_6762a26577a817e3_14: lit room window
+import windowDark from './pack/window_dark.png';        // tex1_128x256_d04b2a47de41886f_14: unlit window
+import ivy from './pack/ivy_wall_sparse.png';           // baked by tools/bake_pack.ps1 from tex1_256x256_b1f146a02e852a5c_58e6f72f9187a76f_8
+import flagstone from './pack/ground_flagstone_crop.png'; // baked from tex1_256x128_307b089b26985229_14: outdoor floor, edge cut, 1024x512
+import brickRough from './pack/brick_wall_rough_level.png'; // baked from tex1_256x128_2255d8c5092aa031_14: outer walls, turned level
+import facadeBrick from './pack/facade_brick_level.png';    // baked from tex1_256x128_8f76faec106263d3_14: building facades, turned level
+import flagBanner from './pack/flag_banner.png';        // tex1_128x64_fa9e081f1ee3e25b_14: hangs by the entrance
+import crateWide from './pack/crate_wide_wood.png';     // tex1_128x64_fbf948d6e5917f27_14: long crate
+import crateA from './pack/crate_square_a.png';         // tex1_64x64_414182222a620001_14: square crate, one per crate
+import crateB from './pack/crate_square_b.png';         // tex1_64x64_31841256d006ff67_14: square crate, one per crate
+import treeA from './pack/tree_foliage_a.png';          // tex1_256x128_3c27a77a50de9926_7b6eebc8fb24f8a1_9
+import treeB from './pack/tree_foliage_b.png';          // tex1_256x128_7d52d6ac83ef1721_765591499361d3c2_8
+import radio from './pack/radio.png';                   // tex1_128x128_fab07a580d84dbdb_14
+import soldierSheet from './pack/soldier_sheet.png';    // tex1_256x256_ce1e2eb5faa0f5c0_14: uniform + helmet atlas
+import stone from './pack/stone_wall_tan_blocks.png';
+import stoneDark from './pack/brick_wall_dark.png';
+import plaster from './pack/plaster_wall_grey.png';
+import roof from './pack/roof_tiles_brown.png';
+import planks from './pack/wood_planks_horizontal.png';
+import dirt from './pack/ground_dirt_mud.png';
+import doorPanels from './pack/door_wood_panels.png';   // tex1_128x64_43f57a464d02232b_14: panelled door (turned to stand upright)
+import flag from './pack/flag_nazi_banner.png';
+import crateEagle from './pack/crate_wood_eagle_stencil.png';
+import poster from './pack/poster_wartime_propaganda.png';
+import gunwood from './pack/rifle_stock_wood.png';
+import gunmetal from './pack/gun_metal_dark.png';
+import grenadeMetal from './pack/grenade_metal.png';   // Metal15_col from the grenade model pack: canister head
+import grenadeWood from './pack/grenade_wood.png';     // Wood03_col from the grenade model pack: handle
+import skyNight from './pack/sky_night_moon.png';      // City Rooftop Night panorama (courtyard-assets/models/Skybox): buildings removed, moon and stars kept, 2048x1024
 
-const FILES = { stone, stoneDark, plaster, cobble, roof, planks, crate, dirt, door, flag, crateEagle, poster, gunwood, gunmetal, atlasGrey, atlasSepia, face768, face758 };
+const FILES = {
+  brickRough, facadeBrick, flagstone, ivy,
+  windowLit, windowDark, flagBanner, crateWide, crateA, crateB,
+  treeA, treeB, radio, soldierSheet,
+  stone, stoneDark, plaster, roof, planks, dirt, doorPanels, flag, crateEagle, poster, gunwood, gunmetal,
+  grenadeMetal, grenadeWood, skyNight,
+};
 export function packTextures(T) {
   const loader = new THREE.TextureLoader();
   for (const [name, url] of Object.entries(FILES)) {
@@ -32,18 +50,23 @@ export function packTextures(T) {
   return T;
 }
 
-// breast eagle on the field-grey / dark tunics (right breast, above the pocket)
-export function stampEagle(T) {
-  const img = new Image();
-  img.onload = () => {
-    for (const u of T.sUniforms) {
-      const c = u.tunic.image;
-      c.getContext('2d').drawImage(img, 66, 22);
-      u.tunic.needsUpdate = true;
-    }
-  };
-  img.src = eagle;
+// Pictures that were turned, cut or thinned are baked to files by tools/bake_pack.ps1 and loaded in FILES above.
+// Only the helmet steel is still painted on a canvas, and it is drawn at once, before its first upload.
+// The helmet steel: a plain dark gradient for the helmet (a flat gunmetal with a faint top-to-bottom sheen)
+export function derivedTextures(T) {
+  T.helmetBlack = steelTex();
   return T;
+}
+
+// plain gunmetal texture for the helmet: a vertical gradient, no pattern
+function steelTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 64);
+  gr.addColorStop(0, '#3a3e42'); gr.addColorStop(0.5, '#22252a'); gr.addColorStop(1, '#181b1e');
+  x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
 }
 
 // remap every vertex of a geometry into a rectangle of the atlas (u, v in 0..1 -> x0..x1, y0..y1)

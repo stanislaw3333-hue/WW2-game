@@ -8,20 +8,22 @@ import { M } from '../render/materials.js';
 export const glows = [];
 
 // world-space UVs so textures line up across neighbouring blocks
-export function worldUV(geo, tile, ox, oy, oz) {
+// aspect = picture width / height: the vertical scale follows it, so the picture keeps its proportions (1 = square)
+export function worldUV(geo, tile, ox, oy, oz, aspect = 1) {
   const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
+  const k = aspect / tile;
   for (let i = 0; i < p.count; i++) {
     const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
     const x = p.getX(i) + ox, y = p.getY(i) + oy, z = p.getZ(i) + oz;
-    if (ay >= ax && ay >= az) uv.setXY(i, x / tile, z / tile);
-    else if (ax >= az) uv.setXY(i, z / tile, y / tile);
-    else uv.setXY(i, x / tile, y / tile);
+    if (ay >= ax && ay >= az) uv.setXY(i, x / tile, z * k);
+    else if (ax >= az) uv.setXY(i, z / tile, y * k);
+    else uv.setXY(i, x / tile, y * k);
   }
 }
 export function addBox(cx, y0, cz, w, h, d, material, o = {}) {
   const seg = o.seg || 2.5;
   const g = new THREE.BoxGeometry(w, h, d, Math.max(1, Math.round(w / seg)), Math.max(1, Math.round(h / seg)), Math.max(1, Math.round(d / seg)));
-  if (!o.fit) worldUV(g, o.tile || 2, cx, y0 + h / 2, cz);
+  if (!o.fit) worldUV(g, o.tile || 2, cx, y0 + h / 2, cz, material.userData.aspect || 1);
   const m = new THREE.Mesh(g, material);
   m.position.set(cx, y0 + h / 2, cz);
   if (o.rotY) m.rotation.y = o.rotY;
@@ -49,10 +51,13 @@ export function quad(a, b, c, d, material, o = {}) {
   const lu = o.fit ? 1 : A.distanceTo(B) / (o.tile || 2), lv = o.fit ? 1 : A.distanceTo(D) / (o.tile || 2);
   const pos = [], uvs = [], idx = [];
   const p0 = new V3(), p1 = new V3();
+  const vm = o.vmax || 1;   // o.vmax: show only the first part of the picture (e.g. 2/3 of it), so it is cropped, not squashed
   for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
     const s = i / nu, t = j / nv;
     p0.lerpVectors(A, B, s); p1.lerpVectors(D, C, s); p0.lerp(p1, t);
-    pos.push(p0.x, p0.y, p0.z); uvs.push(s * lu, t * lv);
+    pos.push(p0.x, p0.y, p0.z);
+    // o.rot turns the picture 90 degrees, for a landscape image hung as a portrait banner
+    if (o.rot) uvs.push(t * lv * vm, (1 - s) * lu); else uvs.push(s * lu, t * lv * vm);
   }
   for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
     const i0 = j * (nu + 1) + i, i1 = i0 + 1, i2 = i0 + nu + 1, i3 = i2 + 1;
@@ -110,7 +115,7 @@ export function addArch(cx, cz, alongZ) {
 // buttress pier against a wall face; (nx,nz) points away from the wall
 export function pier(x, z, nx, nz) {
   const w = nx ? 0.32 : 0.8, d = nx ? 0.8 : 0.32;
-  addBox(x + nx * 0.15, 0, z + nz * 0.15, w, 4.75, d, M.stone, { ...DECO, tile: 3 });
+  addBox(x + nx * 0.15, 0, z + nz * 0.15, w, 4.75, d, M.brick, { ...DECO, tile: 3 });
   addBox(x + nx * 0.15, 4.75, z + nz * 0.15, w + 0.14, 0.16, d + 0.14, M.stoneDark, DECO);
   addBox(x + nx * 0.2, 0, z + nz * 0.2, w + 0.12, 0.5, d + 0.12, M.stoneDark, DECO);
 }

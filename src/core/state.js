@@ -5,9 +5,7 @@ export const S = {
   state: 'title',          // 'title' | 'play' | 'pause' | 'dead'
   time: 0,
   kills: 0,                // enemy soldiers down
-  hits: 0,                 // practice targets down
   message: '', messageT: 0,
-  cycleT: -1,              // seconds until the targets reset (after all are down)
   deadT: 0,
   zoneMsg: 0,              // which yard-entry message has been shown
   hintT: -1,
@@ -23,7 +21,6 @@ export const player = { x: PLAYER.spawn.x, z: PLAYER.spawn.z, y: 0, vy: 0, yaw: 
 export const keys = {};
 export const enemies = [];
 export const enemyParts = [];   // hit boxes of living soldiers (raycast targets)
-export const targets = [];      // practice targets
 export const boxes = [];        // collision: axis-aligned blocks {x0,x1,z0,z1}
 export const circles = [];      // collision: round pillars {cx,cz,r}
 export const shootables = [];   // meshes bullets can hit

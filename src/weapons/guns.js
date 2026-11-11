@@ -55,7 +55,7 @@ function buildGuns() {
   {
     const root = new THREE.Group(); gunScene.add(root);
     addBaked(K98_MODEL, root, { wood, metal });
-    const bolt = new THREE.Group(); bolt.position.set(0, 0.03, 0.075); root.add(bolt);
+    const bolt = new THREE.Group(); bolt.position.set(0, 0.008, -0.045); root.add(bolt);   // lowered and moved forward onto the receiver
     tube(0.0095, -0.05, 0.05, 0, metal, bolt, 8);
     tube(0.011, -0.075, -0.045, 0, dark, bolt, 8);
     cross(0.0045, 0.045, 0.028, -0.008, 0, metal, bolt, 6).rotation.z = -0.35;
@@ -71,19 +71,36 @@ function buildGuns() {
     WEAPONS[0].m = { root, bolt, left, right, flash, flash2, clip };
   }
 
-  // ---- MP40: body is the baked model; magazine (reloads), bolt, hands and muzzle flash stay procedural
+  // ---- MP40: body is the baked model; the cocking handle on the left of the receiver is its own baked part and slides back on each shot; magazine (reloads), hands and muzzle flash stay procedural
   {
     const root = new THREE.Group(); gunScene.add(root); root.visible = false;
-    addBaked(MP40_MODEL, root, { metal });
+    const parts = addBaked(MP40_MODEL, root, { metal, bolt: metal });
+    const bolt = parts[MP40_MODEL.meshes.findIndex(m => m.mat === 'bolt')];   // the left cocking handle, at its rest position in the model
     const mag = new THREE.Group(); root.add(mag);
     prof([[0.141, -0.05], [0.169, -0.05], [0.173, -0.24], [0.146, -0.24]], 0.023, dark, mag, 0.003);
     const magNew = mag.clone(); root.add(magNew); magNew.visible = false;   // fresh magazine that is inserted during reload
-    const bolt = new THREE.Group(); bolt.position.set(-0.026, 0.024, -0.11); root.add(bolt);
-    cross(0.0048, 0.032, 0, 0, 0, metal, bolt, 6); ball(0.007, -0.016, 0, 0, metal, bolt);
     const left = arm(root, -0.002, -0.128, 0.156, -0.25, -0.35, -0.12, 1.1);
     const right = arm(root, 0.004, -0.074, -0.066, 0.15, -0.28, -0.45);
     const [flash, flash2] = flashes(root, -0.47);
     WEAPONS[1].m = { root, bolt, mag, magNew, left, right, flash, flash2 };
+  }
+
+  // ---- Stielhandgranate: wooden handle with a metal canister head, held in the right hand. The throw animation is in player/update.js.
+  // bolt, clip and flashes exist only so the shared viewmodel code can drive them; they never show.
+  {
+    const root = new THREE.Group(); gunScene.add(root); root.visible = false;
+    const nade = new THREE.Group(); root.add(nade);
+    nade.rotation.x = Math.PI / 2; nade.position.y = -0.17;   // stands upright: head up, the hand grips the handle at f = 0.1
+    const gWood = mat(T.grenadeWood, o), gMetal = mat(T.grenadeMetal, od);   // model pack textures (wood handle, metal canister)
+    tube(0.016, 0.02, 0.2, 0, gWood, nade, 8);                       // handle; the hand grips it around f = 0.1
+    tube(0.034, 0.2, 0.3, 0, gMetal, nade, 10);                      // canister head, pointing forward
+    tube(0.036, 0.3, 0.31, 0, gMetal, nade, 10);                     // cap
+    const bolt = new THREE.Group(); root.add(bolt);
+    const clip = new THREE.Group(); root.add(clip); clip.visible = false;
+    const right = arm(root, 0.02, -0.07, 0.1, 0.16, -0.3, -0.5);
+    const left = new THREE.Group(); root.add(left);
+    const [flash, flash2] = flashes(root, -0.4);
+    WEAPONS[2].m = { root, nade, bolt, left, right, flash, flash2, clip };
   }
   G.brass = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.012, 0.05), mat(T.brass, o)); G.brass.visible = false; gunScene.add(G.brass);
   G.brassV = new V3(); G.brassLife = 0;
@@ -93,6 +110,7 @@ buildGuns();
 // the gun the player holds: index, timers and animation drivers. ammo/reserve proxy the active weapon.
 export const gun = {
   w: 0, next: 0, swapped: false, state: 'idle', t: 0, cool: 0, heat: 0, boltT: 0, ads: 0, kick: 0, flash: 0, swayX: 0, swayY: 0, camKick: 0,
+  thrown: false,   // grenade: true once this throw has left the hand
   get ammo() { return WEAPONS[this.w].ammo; }, set ammo(v) { WEAPONS[this.w].ammo = v; },
   get reserve() { return WEAPONS[this.w].reserve; }, set reserve(v) { WEAPONS[this.w].reserve = v; },
 };

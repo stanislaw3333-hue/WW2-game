@@ -8,6 +8,7 @@ import { SFX } from '../audio/audio.js';
 import { resolve } from '../player/collide.js';
 import { poseEnemy } from './soldiers.js';
 import { alertEnemy, enemyShoot } from './combat.js';
+import { updateChatter } from './chatter.js';
 
 const losRay = new THREE.Raycaster(), losA = new V3(), losD = new V3();
 function hasLOS(e) {
@@ -29,6 +30,7 @@ function navTarget(e) {
 }
 export function updateEnemies(dt) {
   const live = S.state === 'play';
+  updateChatter();
   for (const e of enemies) {
     const dx = player.x - e.x, dz = player.z - e.z, dist = Math.hypot(dx, dz) || 0.01;
     if (!e.alive) {
@@ -44,7 +46,9 @@ export function updateEnemies(dt) {
     if (e.losT <= 0) {
       e.losT = 0.18 + Math.random() * 0.12;
       const had = e.los;
-      e.los = live && dist < ENEMY.sightRange && hasLOS(e);
+      // while the player is in the passage, soldiers in the enemy yard cannot see them; they are seen once inside the courtyard
+      const hidden = zoneOf(player.x) === 1 && zoneOf(e.x) !== 1;
+      e.los = live && !hidden && dist < ENEMY.sightRange && hasLOS(e);
       if (e.los && !e.alert) {
         const facing = (Math.sin(e.yaw) * dx + Math.cos(e.yaw) * dz) / dist;
         if (dist < 7 || (dist < 28 && facing > 0.1)) alertEnemy(e);

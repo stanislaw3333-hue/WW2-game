@@ -1,12 +1,13 @@
 // Per-frame player update: look, movement, weapon state machine, reload and switch animation, and the viewmodel pose.
 import { V3, clamp, lerp, sstep } from '../core/util.js';
-import { S, say, player, keys, targets, enemies } from '../core/state.js';
-import { PLAYER } from '../core/config.js';
+import { S, say, player, keys } from '../core/state.js';
+import { PLAYER, GRENADE } from '../core/config.js';
 import { camera } from '../render/renderer.js';
 import { SFX } from '../audio/audio.js';
 import { G, WEAPONS, gun, curW } from '../weapons/guns.js';
 import { resolve } from './collide.js';
-import { fire, tryReload } from './shooting.js';
+import { fire, tryReload, startThrow } from './shooting.js';
+import { launchGrenade } from '../effects/grenade.js';
 import { AMMO_SPOTS } from '../world/level.js';
 
 function boltCycle(u) { // u 0..1 -> [rotation 0..1, pulled back 0..1]
@@ -47,20 +48,29 @@ export function update(dt) {
     if (gun.state === 'idle' && S.wantW !== gun.w) { gun.state = 'switch'; gun.t = 0; gun.next = S.wantW; gun.swapped = false; SFX.click(0, 1200); S.wantW = -1; }
     else if (gun.state !== 'fire') S.wantW = -1;
   }
-  const want = S.adsHeld && gun.state !== 'reload' && gun.state !== 'switch' && !sprint;
+  const want = S.adsHeld && gun.state !== 'reload' && gun.state !== 'switch' && !sprint && w.kind !== 'grenade';
   gun.ads = lerp(gun.ads, want ? 1 : 0, 1 - Math.exp(-dt * 12));
   if ((S.firePressed || (w.auto && S.fireHeld)) && gun.state === 'idle' && gun.cool <= 0) {
-    if (w.ammo > 0) fire();
+    if (w.ammo > 0) { if (w.kind === 'grenade') startThrow(); else fire(); }
     else if (w.reserve > 0) tryReload();
     else if (S.firePressed) { SFX.click(0, 3200); say('OUT OF AMMO - FIND AN AMMO CRATE', 2.5); }
   }
   S.firePressed = false;
-  let rot = 0, back = 0, cyc = 0, low = 0, mDrop = 0, mRise = 0, mSwap = false, clipOn = false, clipY = 0, press = 0;
+  // automatic fire sound runs while the trigger is held and the gun can actually fire
+  SFX.autoFire(w.auto && S.fireHeld && gun.state === 'idle' && w.ammo > 0);
+  let rot = 0, back = 0, cyc = 0, low = 0, mDrop = 0, mRise = 0, mSwap = false, clipOn = false, clipY = 0, press = 0, thr = 0, whip = 0;
   if (gun.state === 'switch') {
     const t = gun.t;
     low = t < 0.26 ? sstep(0, 0.24, t) : 1 - sstep(0.28, 0.52, t);
     if (!gun.swapped && t >= 0.26) { gun.swapped = true; gun.w = gun.next; WEAPONS.forEach((x, i) => { x.m.root.visible = i === gun.w; }); SFX.click(0, 1900); }
     if (t > 0.52) gun.state = 'idle';
+  } else if (gun.state === 'throw') {
+    // stielhandgranate: wind back, whip forward, let go at the release frame, then the next grenade is readied from reserve
+    const t = gun.t;
+    thr = sstep(0, 0.3, t) * (1 - sstep(GRENADE.releaseT, GRENADE.releaseT + 0.08, t));
+    whip = sstep(GRENADE.releaseT, GRENADE.releaseT + 0.12, t) * (1 - sstep(0.6, GRENADE.throwT, t));
+    if (!gun.thrown && t >= GRENADE.releaseT) { gun.thrown = true; launchGrenade(); SFX.grenadeThrow(); }
+    if (t >= GRENADE.throwT) { gun.state = 'idle'; const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
   } else if (!w.auto) {
     if (gun.state === 'fire') {
       const u = clamp((gun.t - 0.3) / 0.85, 0, 1); [rot, back] = boltCycle(u); cyc = Math.sin(u * Math.PI);
@@ -74,17 +84,12 @@ export function update(dt) {
       const t = gun.t, p = t - dt;
       low = sstep(0, 0.35, t) - sstep(2.3, 2.65, t);
       rot = sstep(0.35, 0.5, t) - sstep(1.95, 2.1, t); back = sstep(0.5, 0.7, t) - sstep(1.75, 1.95, t);
-      if (p < 0.4 && t >= 0.4) SFX.click(0, 2400);
-      if (p < 0.6 && t >= 0.6) SFX.click(0, 1700);
-      if (p < 1.05 && t >= 1.05) SFX.click(0, 3300);
-      if (p < 1.35 && t >= 1.35) { SFX.click(0, 1300); SFX.click(0.06, 1500); const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
-      if (p < 1.85 && t >= 1.85) SFX.click(0, 2000);
-      if (p < 2.05 && t >= 2.05) SFX.click(0, 2900);
+      // the reload sample (started in tryReload) carries the mechanical sounds; only the refill happens here
+      if (p < 1.35 && t >= 1.35) { const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
       // stripper clip: hand brings it down onto the open receiver, rounds drop in, clip is discarded
       clipOn = t > 0.7 && t < 1.38;
       clipY = 0.13 - sstep(0.75, 1.05, t) * 0.083;
       press = sstep(0.75, 1.05, t) - sstep(1.2, 1.38, t);
-      if (p < 0.78 && t >= 0.78) SFX.click(0, 1400);                 // clip seated
       if (t > 2.65) gun.state = 'idle';
     }
   } else {
@@ -94,9 +99,8 @@ export function update(dt) {
       low = sstep(0, 0.3, t) - sstep(1.95, 2.3, t);
       // magazine swap: old magazine drops out, the fresh one rises into the well, then the bolt is charged
       mDrop = sstep(0.35, 0.8, t); mRise = sstep(0.9, 1.3, t); mSwap = t >= 0.9 && t < 1.35;
-      if (p < 0.42 && t >= 0.42) SFX.click(0, 1500);
-      if (p < 1.28 && t >= 1.28) { SFX.click(0, 1300); SFX.click(0.05, 1700); const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
-      if (p < 1.7 && t >= 1.7) { SFX.click(0, 2300); gun.boltT = 0.1; }
+      if (p < 1.28 && t >= 1.28) { const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
+      if (p < 1.7 && t >= 1.7) gun.boltT = 0.1;
       if (t > 2.3) gun.state = 'idle';
     } else if (gun.state === 'idle' && w.ammo === 0 && w.reserve > 0 && gun.cool <= -0.25) tryReload();
   }
@@ -110,14 +114,19 @@ export function update(dt) {
     lerp(cw.hip[1], cw.adsY, a) + by + breathe + gun.swayY * (1 - a * 0.7) - cyc * 0.018 - low * 0.05 - (sprint ? 0.03 : 0) * (1 - a),
     lerp(cw.hip[2], cw.adsZ, a) + k * cw.kz);
   gm.root.rotation.set(lerp(0.035, 0, a) + k * cw.kr - low * 0.25 + cyc * 0.03, lerp(cw.hipYaw, 0, a) + gun.swayX * 1.5 + low * 0.2, -cyc * 0.22 + low * 0.3 - gun.swayX * 2);
-  if (!cw.auto) {
-    gm.bolt.rotation.z = rot * 1.45; gm.bolt.position.z = 0.075 + back * 0.085;
+  if (cw.kind === 'grenade') {
+    // throw pose: the head of the grenade tips up and back on the windup, then snaps down and across through the release
+    gm.root.position.z += thr * 0.1; gm.root.position.y += thr * 0.04 - whip * 0.05;
+    gm.root.rotation.x += thr * 0.8 - whip * 1.2; gm.root.rotation.y -= whip * 0.35;
+    gm.nade.visible = gun.state === 'throw' ? !gun.thrown : w.ammo > 0;   // the grenade in hand; gone once released
+  } else if (!cw.auto) {
+    gm.bolt.rotation.z = rot * 1.45; gm.bolt.position.z = -0.045 + back * 0.085;
     const hw = gun.state === 'fire' ? sstep(0.18, 0.32, gun.t) - sstep(1.02, 1.18, gun.t) : 0;
     gm.right.position.set(0.045 * hw, (0.07 + rot * 0.035) * hw, (-0.06 + back * 0.085) * hw);
     gm.right.position.y -= press * 0.035;                             // right hand presses the clip in
     gm.clip.visible = clipOn; gm.clip.position.y = clipY;
   } else {
-    gm.bolt.position.z = -0.11 + back * 0.05;
+    gm.bolt.position.z = back * 0.05;   // the baked bolt rests at its model position and slides back on each shot
     gm.mag.position.y = -mDrop * 0.35; gm.mag.rotation.x = mDrop * 0.3; gm.mag.visible = !mSwap;
     gm.magNew.visible = mSwap; gm.magNew.position.y = -0.35 + mRise * 0.35;
     gm.left.position.set(0, -mDrop * 0.16, mDrop * 0.03);
@@ -135,9 +144,7 @@ export function update(dt) {
   // hints as you move between the yards
   if (S.hintT > 0) { S.hintT -= dt; if (S.hintT <= 0 && S.messageT <= 0) say('THE WEST ARCH LEADS TO THE ENEMY YARD', 5); }
   if (S.zoneMsg < 1 && player.x < -21.5) { S.zoneMsg = 1; say('ENEMY YARD AHEAD - 1 OR 2 SWITCHES WEAPON', 4); }
-  if (S.zoneMsg < 2 && player.x < -32.5 && S.kills < enemies.length) { S.zoneMsg = 2; say('CLEAR THE YARD - ' + (enemies.length - S.kills) + ' ENEMY SOLDIERS', 4); }
   // objective cycle
-  if (S.cycleT > 0) { S.cycleT -= dt; if (S.cycleT <= 0) { S.hits = 0; targets.forEach(t => { t.down = false; }); say('TARGETS RESET', 2.5); } }
 
   // camera
   const eye = lerp(1.68, 1.05, player.crouch) + player.y + Math.abs(Math.sin(player.bob)) * 0.045 * player.move;

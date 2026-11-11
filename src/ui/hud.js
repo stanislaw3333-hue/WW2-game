@@ -1,6 +1,6 @@
 // HUD: drawn each frame into a small canvas (low-res, nearest-neighbour scaled up). Pixel font from textures.js.
 import { clamp, LOW_H } from '../core/util.js';
-import { S, player, targets, enemies } from '../core/state.js';
+import { S, player } from '../core/state.js';
 import { hud } from '../render/renderer.js';
 import { drawText5 as drawText, textW5 as textW } from '../textures.js';
 import { gun, curW } from '../weapons/guns.js';
@@ -18,9 +18,9 @@ export function drawHUD() {
     ctxt('COURTYARD 1944', 44, 3, '#d8c890', '#201808');
     ctxt('MISSION ONE - THE TWO COURTYARDS', 72, 1, '#b0a888');
     if (Math.floor(S.time * 2) % 2 === 0) ctxt('CLICK OR PRESS ENTER', 118, 2, '#f0e8d0');
-    const lines = ['WASD MOVE - MOUSE LOOK - SHIFT RUN', 'C CROUCH - SPACE JUMP - R RELOAD', 'LEFT CLICK FIRE - RIGHT CLICK AIM', '1 / 2 / Q / WHEEL - SWITCH WEAPON', 'F11 FULLSCREEN - ESC PAUSE'];
+    const lines = ['WASD MOVE - MOUSE LOOK - SHIFT RUN', 'C CROUCH - SPACE JUMP - R RELOAD', 'LEFT CLICK FIRE - RIGHT CLICK AIM', '1 / 2 / 3 / Q / WHEEL - SWITCH WEAPON', 'F11 FULLSCREEN - ESC PAUSE'];
     lines.forEach((l, i) => ctxt(l, H - 70 + i * 12, 1, '#c8c0a0'));
-    ctxt('ARMED WITH: KARABINER 98K AND MP 40', 10, 1, '#908868');
+    ctxt('ARMED WITH: 98K, MP 40 AND GRENADES', 10, 1, '#908868');
     return;
   }
   // crosshair
@@ -45,22 +45,17 @@ export function drawHUD() {
   hud.fillStyle = '#000'; hud.fillRect(48, H - 21, 54, 8);
   hud.fillStyle = '#403828'; hud.fillRect(49, H - 20, 52, 6);
   hud.fillStyle = player.hp > 50 ? '#7a9a48' : player.hp > 25 ? '#c8a048' : '#d04030'; hud.fillRect(49, H - 20, Math.round(52 * player.hp / 100), 6);
-  // ammo
-  if (!cw.auto) {
-    for (let i = 0; i < 5; i++) {
-      const bx = W - 68 + i * 6, by = H - 24;
-      hud.fillStyle = '#000'; hud.fillRect(bx + 1, by + 1, 4, 13);
-      if (i < cw.ammo) { hud.fillStyle = '#c8a048'; hud.fillRect(bx, by + 4, 4, 9); hud.fillStyle = '#b06830'; hud.fillRect(bx + 1, by, 2, 4); hud.fillRect(bx, by + 2, 4, 2); }
-      else { hud.fillStyle = '#403828'; hud.fillRect(bx, by + 4, 4, 9); }
-    }
-    txt(String(cw.reserve), W - 32, H - 24, 2, cw.reserve ? '#e8e0c0' : '#d04030');
-  } else {
-    txt(String(cw.ammo), W - 68, H - 24, 2, cw.ammo ? '#e8e0c0' : '#d04030');
-    txt('/' + cw.reserve, W - 40, H - 17, 1, cw.reserve ? '#c8c0a0' : '#d04030');
+  // ammo, as on the reference HUD: rounds in the magazine, a single cartridge, then rounds in reserve
+  {
+    const rs = String(cw.reserve), rx = W - 8 - textW(rs, 2), by = H - 22;
+    txt(rs, rx, H - 15, 2, cw.reserve ? '#e8e0c0' : '#d04030');
+    const bx = rx - 9;
+    hud.fillStyle = '#000'; hud.fillRect(bx - 1, by - 1, 6, 12);
+    hud.fillStyle = '#c8a048'; hud.fillRect(bx, by + 2, 4, 8);
+    hud.fillStyle = '#b06830'; hud.fillRect(bx + 1, by, 2, 2);
+    const ms = String(cw.ammo), mx = bx - 6 - textW(ms, 3);
+    txt(ms, mx, by - 3, 3, cw.ammo ? '#e8e0c0' : '#d04030');
   }
-  txt(cw.name, W - 68, H - 36, 1, '#a89868');
-  txt('TARGETS ' + S.hits + '/' + targets.length, 8, 8, 1, '#c8c0a0');
-  txt('ENEMIES ' + S.kills + '/' + enemies.length, 8, 19, 1, S.kills >= enemies.length ? '#7a9a48' : '#c8c0a0');
   if (gun.state === 'reload' && !dead) ctxt('RELOADING', H / 2 + 24, 1, '#c8c0a0');
   if (S.messageT > 0 && !dead) ctxt(S.message, 36, textW(S.message, 2) < W - 24 ? 2 : 1, '#f0e8d0');
   if (dead) {
@@ -71,7 +66,22 @@ export function drawHUD() {
   if (S.state === 'pause') {
     hud.fillStyle = 'rgba(0,0,10,0.6)'; hud.fillRect(0, 0, W, H);
     ctxt('PAUSED', 80, 3, '#d8c890', '#201808');
-    ctxt('CLICK TO RESUME', 124, 2, '#f0e8d0');
-    ctxt('Q - QUIT TO DESKTOP', 150, 1, '#c8c0a0');
+    ctxt('CLICK TO RESUME', 116, 2, '#f0e8d0');
+    const b = resetButton();
+    hud.fillStyle = '#3a2a10'; hud.fillRect(b.x, b.y, b.w, b.h);
+    hud.fillStyle = '#d8c890'; hud.fillRect(b.x, b.y, b.w, 1); hud.fillRect(b.x, b.y + b.h - 1, b.w, 1);
+    hud.fillRect(b.x, b.y, 1, b.h); hud.fillRect(b.x + b.w - 1, b.y, 1, b.h);
+    ctxt('RESET LEVEL', b.y + 5, 2, '#f0e8d0');
+    ctxt('Q - QUIT TO DESKTOP', 178, 1, '#c8c0a0');
   }
+}
+// the pause screen's RESET LEVEL button, in low-res HUD pixels
+function resetButton() {
+  const w = textW('RESET LEVEL', 2) + 16;
+  return { x: Math.round((S.lowW - w) / 2), y: 146, w, h: 18 };
+}
+// true when a click at page position (cx, cy) lands on the RESET LEVEL button
+export function resetButtonAt(cx, cy) {
+  const b = resetButton(), x = cx / innerWidth * S.lowW, y = cy / innerHeight * LOW_H;
+  return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
 }

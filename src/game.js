@@ -12,6 +12,7 @@ import { start } from './session.js';
 import { hurtPlayer } from './enemies/combat.js';
 import { tryReload } from './player/shooting.js';
 import { WEAPONS, gun } from './weapons/guns.js';
+import { setListener } from './audio/audio.js';
 
 addEventListener('resize', resize); resize();
 
@@ -31,6 +32,7 @@ function frame(now) {
     camera.position.y = lerp(camera.position.y, 0.32, k); camera.rotation.z = lerp(camera.rotation.z, 0.55, k); camera.rotation.x = lerp(camera.rotation.x, 0.15, k);
   }
   if (S.state !== 'pause') updateWorld(dt);
+  setListener(camera);
   if (S.messageT > 0 && S.state === 'play') S.messageT -= dt;
   camera.updateProjectionMatrix();
   renderer.clear();

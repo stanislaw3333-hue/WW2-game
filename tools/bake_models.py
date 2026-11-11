@@ -12,8 +12,9 @@ CFG = {
     "k98": dict(length=1.23, rot=90, muzzle=1, origin_x=-0.337,
                 drop=["7.92x57", "79257", "79257 5rnd clip", "79257 5rnd clip empty", "bolt", "idk for bolt"],
                 mats={"1wo": "wood", "kar98 marking": "wood"}),
+    # parts: objects split out into their own mesh key so the game can move them (the MP40 bolt slides on its own)
     "mp40": dict(length=0.80, rot=-90, muzzle=-1, origin_x=0.137,
-                 drop=["Cube.002", "Cube.004"], mats={}),
+                 drop=["Cube.002", "Cube.004"], mats={}, parts={"Cylinder.002": "bolt"}),
     "pz1": dict(length=5.4, rot=None, muzzle=None, origin_x=None, drop=[],
                 mats={"gray": "armor", "black": "tire"}),
     "pg": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry",
@@ -22,7 +23,16 @@ CFG = {
     "pga": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="aim",
                 mats={"Material.003": "uniform", "helmetm42_low": "helmet", "scrimwire_low": "helmet",
                       "scrimleaves_low": "helmet", "ammopouchesgerman_low": "leather"}),
+    # German soldier FBX (Mixamo-style rig, no "mixamorig:" prefix). The wrapper script names the material
+    # slots "uniform" (Soldier_1) and "helmet" (Helmet) before this runs. Its UVs index german_soldier_tex.
+    "gs": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry", prefix="", chain=3,
+               mats={"uniform": "uniform", "helmet": "helmet"}),
+    # aim: trigger elbow drops low and back, support elbow low and out (the reference shouldering pose)
+    "gsa": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="aim", prefix="", chain=3,
+                pole_r=(-0.45, 0.85, -0.3), pole_l=(0.5, 0.85, 0.1),
+                mats={"uniform": "uniform", "helmet": "helmet"}),
 }[cfg_name]
+BONE = CFG.get("prefix", "mixamorig:")
 
 def evaluated_meshes():
     dg = bpy.context.evaluated_depsgraph_get()
@@ -56,9 +66,10 @@ if CFG.get("pose"):
         return Vector((t[0] / S + cx, -t[2] / S + cy, t[1] / S + fz))
     # rifle grips from src/game.js poseEnemy, in the rifle's own frame: right hand on the rifle origin,
     # left hand 0.2 m along the rifle's +z. Carried: rifle (0, 1.07, 0.2), Euler(0.45, 0.65, 0).
-    # Shouldered: rifle (-0.085, 1.4, 0.31), Euler(0, 0.05, 0). Euler order is YXZ, as in three.js.
+    # Shouldered: rifle (-0.085, 1.5, 0.25), Euler(0, 0.05, 0). Euler order is YXZ, as in three.js.
+    # Kept in step with poseEnemy in src/enemies/soldiers.js.
     if CFG["pose"] == "aim":
-        RIGHT = Vector((-0.085, 1.4, 0.31))
+        RIGHT = Vector((-0.085, 1.5, 0.25))
         rot = Matrix.Rotation(0.05, 3, 'Y')
     else:
         RIGHT = Vector((0.0, 1.07, 0.2))
@@ -66,14 +77,14 @@ if CFG.get("pose"):
     LEFT = RIGHT + rot @ Vector((0.0, 0.0, 0.2))
     arm = bpy.data.objects["Armature"]
     scn = bpy.context.scene
-    for side, tgt, pole, bone in [("R", RIGHT, (-0.55, 1.2, 0.0), "mixamorig:RightHand"),
-                                  ("L", LEFT, (0.55, 1.2, 0.0), "mixamorig:LeftHand")]:
+    for side, tgt, pole, bone in [("R", RIGHT, CFG.get("pole_r", (-0.55, 1.2, 0.0)), BONE + "RightHand"),
+                                  ("L", LEFT, CFG.get("pole_l", (0.55, 1.2, 0.0)), BONE + "LeftHand")]:
         t = bpy.data.objects.new("tgt" + side, None); scn.collection.objects.link(t)
         t.location = to_blender(tgt); t.empty_display_size = 0.05
         p = bpy.data.objects.new("pole" + side, None); scn.collection.objects.link(p)
         p.location = to_blender(pole); p.empty_display_size = 0.05
         c = arm.pose.bones[bone].constraints.new('IK')
-        c.target = t; c.chain_count = 2; c.pole_target = p; c.pole_angle = 0.0
+        c.target = t; c.chain_count = CFG.get("chain", 2); c.pole_target = p; c.pole_angle = 0.0   # chain counts the hand bone itself
         c.use_tail = True
     bpy.context.view_layer.update()
     print("POSED", "R", tuple(round(x, 3) for x in to_blender(RIGHT)), "L", tuple(round(x, 3) for x in to_blender(LEFT)))
@@ -90,7 +101,7 @@ for o, eo, me in meshes:
     for tri in me.loop_triangles:
         slot = o.material_slots[tri.material_index] if tri.material_index < len(o.material_slots) else None
         mname = slot.material.name if slot and slot.material else "none"
-        key = CFG["mats"].get(mname, "metal")
+        key = CFG.get("parts", {}).get(o.name) or CFG["mats"].get(mname, "metal")
         vs = []
         for li in tri.loops:
             p = W @ me.vertices[me.loops[li].vertex_index].co
