@@ -1,0 +1,26 @@
+{
+  "name": "courtyard",
+  "version": "1.0.0",
+  "description": "Courtyard 1944",
+  "private": true,
+  "main": "app/main.js",
+  "scripts": {
+    "build": "esbuild src/game.js --bundle --minify --loader:.png=dataurl --outfile=app/game.js --log-level=warning",
+    "watch": "esbuild src/game.js --bundle --loader:.png=dataurl --outfile=app/game.js --sourcemap --watch",
+    "check": "esbuild src/game.js --bundle --loader:.png=dataurl --outfile=.check/game.js --log-level=warning && node -e \"console.log('check ok')\"",
+    "exe": "bash build-exe.sh outputs",
+    "serve": "node tools/serve.js app 8080",
+    "lint": "eslint --no-config-lookup --parser-options=ecmaVersion:latest --parser-options=sourceType:module --rule \"{'no-undef':'error','no-unused-vars':'warn'}\" --global window,document,location,performance,requestAnimationFrame,addEventListener,innerWidth,innerHeight,speechSynthesis,SpeechSynthesisUtterance,atob,setInterval,console,navigator,Image src",
+    "test": "npm run check && npm run lint"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5"
+  }
+}

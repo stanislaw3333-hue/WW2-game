@@ -1,0 +1,21 @@
+# Dependencies and build output
+node_modules/
+.exe-build/
+.check/
+app/game.js
+
+# Generated and delivered files
+outputs/
+*.exe
+
+# Personal copies of third-party assets (keep local, do not commit)
+src/pack/
+/Models/
+*.zip
+
+# OS and editor noise
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,7 @@
+src/models/
+archive/
+.exe-build/
+outputs/
+.check/
+app/game.js
+package-lock.json

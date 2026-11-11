@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./app/game.js)",
+      "Read(./.check/**)",
+      "Read(./.exe-build/**)",
+      "Read(./outputs/**)",
+      "Read(./node_modules/**)",
+      "Read(./archive/**)",
+      "Read(./src/models/*.json)",
+      "Read(./package-lock.json)",
+      "Read(../courtyard-assets/**/*.zip)"
+    ]
+  }
+}
