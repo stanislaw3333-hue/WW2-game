@@ -6,7 +6,7 @@ import { placeTruck } from './vehicles.js';
 import { scene, mat } from '../render/renderer.js';
 import { M, T } from '../render/materials.js';
 import { worldUV, addBox, addCyl, quad, tri, wallQuad, win, addArch, addLantern } from './geo.js';
-import { R, crate, AMMO_SPOTS } from './props.js';
+import { R, crate } from './props.js';
 
 export function buildYard1() {
   // ground
@@ -120,6 +120,4 @@ export function buildYard1() {
   circles.push({ cx: 5.6, cz: 18.6, r: 0.15 });
   wallQuad('N', 5.6, 18.52, 1.5, 1.2, 1.95, M.sign);
 
-  // --- ammo crates
-  for (const [x, z] of AMMO_SPOTS) addBox(x, 0, z, 1.1, 0.6, 0.7, M.ammo, { fit: true, wood: true });
 }

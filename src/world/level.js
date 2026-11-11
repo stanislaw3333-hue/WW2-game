@@ -7,7 +7,6 @@ import { buildYard1 } from './yard1.js';
 import { buildYard2 } from './yard2.js';
 import { buildDetail } from './detail.js';
 import { buildSearchlights } from '../effects/searchlight.js';
-export { AMMO_SPOTS } from './props.js';
 
 buildYard1(); buildYard2(); buildDetail();
 // --- sky

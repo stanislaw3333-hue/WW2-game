@@ -1,6 +1,8 @@
 // Sample clips bundled as data URLs (esbuild --loader:.mp3=dataurl). Source files: courtyard-assets/audio, cut into clips/.
 import kar98Shot from './clips/kar98_shot.mp3';
 import kar98Reload from './clips/kar98_reload.mp3';
+import footstep from './clips/footstep_concrete.mp3';
+import kar98Rechamber from './clips/kar98_rechamber.mp3';
 import mp40Shot from './clips/mp40_shot_near.mp3';
 import mp40Reload from './clips/mp40_reload.mp3';
 import siren from './clips/siren.mp3';
@@ -59,7 +61,7 @@ import convo_10 from './clips/convo_10.mp3';
 import convo_11 from './clips/convo_11.mp3';
 
 export const CLIPS = {
-  kar98Shot, kar98Reload, mp40Shot, mp40Reload, siren, radio, grenade,
+  kar98Shot, kar98Reload, kar98Rechamber, mp40Shot, mp40Reload, siren, radio, grenade, footstep,
   shouts: [
     shout_01,
     shout_02,

@@ -8,6 +8,35 @@ import { T } from '../render/materials.js';
 import { addBaked } from '../render/baked.js';
 import K98_MODEL from '../models/k98.json';
 import MP40_MODEL from '../models/mp40.json';
+import muzzleSheet from '../effects/muzzle_sheet.png';   // 6 muzzle flash frames from MuzzleFlashVFX (flash_front_01..06), 3 across and 2 down; brightness is the alpha
+
+// one frame of the muzzle sheet is picked at random for each shot (see setFlashFrame)
+export const FLASH_COLS = 3, FLASH_ROWS = 2, FLASH_FRAMES = FLASH_COLS * FLASH_ROWS;
+// centre of each frame's flame in UV, measured from the sheet's alpha once it has loaded (the flames sit off-centre in their cells)
+let flashCentres = null;
+function measureFlashCentres(img) {
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height).data;
+  const cw = c.width / FLASH_COLS, ch = c.height / FLASH_ROWS, out = [];
+  for (let i = 0; i < FLASH_FRAMES; i++) {
+    const x0 = (i % FLASH_COLS) * cw, y0 = Math.floor(i / FLASH_COLS) * ch;
+    let sum = 0, sx = 0, sy = 0;
+    for (let py = y0; py < y0 + ch; py++) for (let px = x0; px < x0 + cw; px++) { const a = d[(py * c.width + px) * 4 + 3]; sum += a; sx += a * px; sy += a * py; }
+    const mx = sum ? sx / sum : x0 + cw / 2, my = sum ? sy / sum : y0 + ch / 2;
+    out.push({ u: mx / c.width, v: 1 - my / c.height });   // image row 0 is the top, UV v = 1
+  }
+  return out;
+}
+// point a flash plane's UVs at one frame, centred on its flame; frame 0 until the sheet has loaded
+export function setFlashFrame(mesh, i) {
+  const cu = flashCentres ? flashCentres[i].u : (i % FLASH_COLS + 0.5) / FLASH_COLS;
+  const cv = flashCentres ? flashCentres[i].v : 1 - (Math.floor(i / FLASH_COLS) + 0.5) / FLASH_ROWS;
+  const u0 = cu - 0.5 / FLASH_COLS, u1 = cu + 0.5 / FLASH_COLS, v0 = cv - 0.5 / FLASH_ROWS, v1 = cv + 0.5 / FLASH_ROWS;
+  const uv = mesh.geometry.attributes.uv;   // PlaneGeometry vertices: top-left, top-right, bottom-left, bottom-right
+  uv.setXY(0, u0, v1); uv.setXY(1, u1, v1); uv.setXY(2, u0, v0); uv.setXY(3, u1, v0);
+  uv.needsUpdate = true;
+}
 
 export const G = {};   // ejected brass: mesh, velocity, remaining life
 export const WEAPONS = WEAPON_DEFS;   // stats live in core/config.js; runtime fields (m, ammo, reserve) are added to these objects
@@ -27,7 +56,9 @@ function buildGuns() {
   const o = { lights: gunL, fog: false, snap: false, affine: 0 };
   const od = { ...o, side: THREE.DoubleSide, emis: 0.35 };  // lift the dark steel so shadowed faces never go black; MP40 parts are thin open shells, so draw both faces
   const wood = mat(T.gunwood, o), metal = mat(T.gunmetal, od), skin = mat(T.skin, o), dark = mat(T.gunmetal, { ...od, tint: [0.8, 0.8, 0.85] });
-  const fm = mat(T.flash, { ...o, additive: true, emis: 1 });
+  const muzzleTex = new THREE.TextureLoader().load(muzzleSheet, t => { flashCentres = measureFlashCentres(t.image); });   // sharp pixels, no mipmaps: keeps the PS1 look
+  muzzleTex.magFilter = muzzleTex.minFilter = THREE.NearestFilter; muzzleTex.generateMipmaps = false;
+  const fm = mat(muzzleTex, { ...o, additive: true, emis: 1 });
   const add = (g, m, parent, x = 0, y = 0, z = 0) => { const b = new THREE.Mesh(g, m); b.position.set(x, y, z); parent.add(b); return b; };
   const prof = (pts, thick, m, parent, bevel) => add(profGeo(pts, thick, bevel), m, parent);
   // tube along the barrel axis from forward distance f0 to f1
@@ -46,8 +77,8 @@ function buildGuns() {
     g.add(c); return g;
   };
   const flashes = (root, z) => {
-    const f1 = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), fm); f1.position.set(0, 0.026, z); f1.visible = false; root.add(f1);
-    const f2 = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.12), fm); f2.position.set(0, 0.026, z - 0.06); f2.rotation.y = Math.PI / 2; f2.visible = false; root.add(f2);
+    const f1 = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), fm); f1.position.set(0, 0.026, z); f1.visible = false; root.add(f1); setFlashFrame(f1, 0);
+    const f2 = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.12), fm); f2.position.set(0, 0.026, z); f2.rotation.y = Math.PI / 2; f2.visible = false; root.add(f2); setFlashFrame(f2, 0);
     return [f1, f2];
   };
 
@@ -62,7 +93,7 @@ function buildGuns() {
     ball(0.011, 0.052, -0.017, 0, metal, bolt);
     const left = arm(root, -0.004, -0.052, 0.29, -0.27, -0.33, -0.08, 1.15);
     const right = arm(root, 0.006, -0.058, -0.15, 0.14, -0.28, -0.52);
-    const [flash, flash2] = flashes(root, -0.74);
+    const [flash, flash2] = flashes(root, -0.767);   // centred on the muzzle tip, measured on the viewmodel
     // stripper clip: five cartridges standing in a steel strip, pressed down into the receiver during reload
     const clip = new THREE.Group(); root.add(clip); clip.visible = false;
     const brass = mat(T.brass, o);
@@ -81,7 +112,7 @@ function buildGuns() {
     const magNew = mag.clone(); root.add(magNew); magNew.visible = false;   // fresh magazine that is inserted during reload
     const left = arm(root, -0.002, -0.128, 0.156, -0.25, -0.35, -0.12, 1.1);
     const right = arm(root, 0.004, -0.074, -0.066, 0.15, -0.28, -0.45);
-    const [flash, flash2] = flashes(root, -0.47);
+    const [flash, flash2] = flashes(root, -0.466);   // centred on the muzzle tip, measured on the viewmodel
     WEAPONS[1].m = { root, bolt, mag, magNew, left, right, flash, flash2 };
   }
 

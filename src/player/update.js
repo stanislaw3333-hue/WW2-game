@@ -8,7 +8,6 @@ import { G, WEAPONS, gun, curW } from '../weapons/guns.js';
 import { resolve } from './collide.js';
 import { fire, tryReload, startThrow } from './shooting.js';
 import { launchGrenade } from '../effects/grenade.js';
-import { AMMO_SPOTS } from '../world/level.js';
 
 function boltCycle(u) { // u 0..1 -> [rotation 0..1, pulled back 0..1]
   return [sstep(0, 0.22, u) - sstep(0.78, 1, u), sstep(0.22, 0.45, u) - sstep(0.55, 0.78, u)];
@@ -39,7 +38,7 @@ export function update(dt) {
   if (keys.Space && player.y === 0) { player.vy = PLAYER.jumpVel; }
   player.vy -= PLAYER.gravity * dt; player.y = Math.max(0, player.y + player.vy * dt); if (player.y === 0) player.vy = 0;
   const pb = player.bob; player.bob += moved * dt * 1.75;
-  if (player.y === 0 && moved > 0.5 && Math.floor(pb / Math.PI) !== Math.floor(player.bob / Math.PI)) { player.stepAlt = !player.stepAlt; SFX.step(player.stepAlt); }
+  if (player.y === 0 && moved > 0.5 && Math.floor(pb / Math.PI) !== Math.floor(player.bob / Math.PI)) { player.stepAlt = !player.stepAlt; SFX.step(player.stepAlt, sprint); }
 
   // weapon state
   const w = curW();
@@ -75,10 +74,8 @@ export function update(dt) {
     if (gun.state === 'fire') {
       const u = clamp((gun.t - 0.3) / 0.85, 0, 1); [rot, back] = boltCycle(u); cyc = Math.sin(u * Math.PI);
       const p = gun.t - dt;
-      if (p < 0.32 && gun.t >= 0.32) SFX.click(0, 2400);
-      if (p < 0.5 && gun.t >= 0.5) { SFX.click(0, 1700); G.brass.visible = true; G.brassLife = 0.5; G.brass.scale.setScalar(1); G.brass.position.copy(w.m.root.position).add(new V3(0.03, 0.06, 0.05)); G.brassV.set(0.9 + Math.random() * 0.4, 1.3, 0.2); }
-      if (p < 0.82 && gun.t >= 0.82) SFX.click(0, 2000);
-      if (p < 1.0 && gun.t >= 1.0) SFX.click(0, 2900);
+      if (p < 0.32 && gun.t >= 0.32) SFX.bolt();
+      if (p < 0.5 && gun.t >= 0.5) { G.brass.visible = true; G.brassLife = 0.5; G.brass.scale.setScalar(1); G.brass.position.copy(w.m.root.position).add(new V3(0.03, 0.06, 0.05)); G.brassV.set(0.9 + Math.random() * 0.4, 1.3, 0.2); }
       if (gun.t > 1.2) { gun.state = 'idle'; if (w.ammo === 0 && w.reserve > 0) tryReload(); }
     } else if (gun.state === 'reload') {
       const t = gun.t, p = t - dt;
@@ -135,10 +132,6 @@ export function update(dt) {
   gm.flash.visible = gm.flash2.visible = gun.flash > 0;
   if (G.brassLife > 0) { G.brassLife -= dt; G.brassV.y -= 9 * dt; G.brass.position.addScaledVector(G.brassV, dt); G.brass.rotation.x += dt * 20; G.brass.rotation.z += dt * 13; if (G.brassLife <= 0) G.brass.visible = false; }
 
-  // ammo crates
-  for (const [ax, az] of AMMO_SPOTS) if (Math.hypot(player.x - ax, player.z - az) < 1.9 && WEAPONS.some(x => x.reserve < x.max)) {
-    WEAPONS.forEach(x => { x.reserve = x.max; }); SFX.pickup(); say('PICKED UP AMMUNITION', 2.5);
-  }
   // health: slow recovery once nobody has hit you for a while
   player.hurt = Math.max(0, player.hurt - dt * 2.2);
   if (player.hp < PLAYER.maxHp && S.time - player.lastHit > PLAYER.regenDelay) player.hp = Math.min(PLAYER.maxHp, player.hp + PLAYER.regenRate * dt);

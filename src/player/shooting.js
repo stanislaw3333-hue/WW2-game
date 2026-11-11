@@ -5,7 +5,7 @@ import { player, enemies, enemyParts, shootables } from '../core/state.js';
 import { scene, camera } from '../render/renderer.js';
 import { M } from '../render/materials.js';
 import { SFX } from '../audio/audio.js';
-import { G, gun, curW } from '../weapons/guns.js';
+import { G, gun, curW, setFlashFrame, FLASH_FRAMES } from '../weapons/guns.js';
 import { alertEnemy, hitEnemy } from '../enemies/combat.js';
 import { spawnParts, placeDecal } from '../effects/fx.js';
 
@@ -22,6 +22,7 @@ export function fire() {
     if (!SFX.autoFireReady()) SFX.smg();   // fallback only: the held-trigger loop plays the MP40 sound otherwise
   } else { gun.state = 'fire'; gun.t = 0; gun.kick = 1; gun.camKick = 1; SFX.shot(); }
   m.flash.rotation.z = Math.random() * 6.28; m.flash.scale.setScalar(0.8 + Math.random() * 0.5);
+  const frame = (Math.random() * FLASH_FRAMES) | 0; setFlashFrame(m.flash, frame); setFlashFrame(m.flash2, frame);
   const spread = w.auto ? lerp(0.024, 0.008, gun.ads) * (1 + gun.heat * 1.3) : 0.004 * (1 - gun.ads);
   if (w.auto) gun.heat = Math.min(1, gun.heat + 0.13);
   // gunfire near the second courtyard wakes everyone in it

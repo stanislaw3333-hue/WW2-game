@@ -1,7 +1,7 @@
 // Enemy combat: shouts, alerting, damage taken by enemies, damage dealt to the player, enemy gunfire.
 import { clamp } from '../core/util.js';
 import { S, player, enemies } from '../core/state.js';
-import { ENEMY } from '../core/config.js';
+import { ENEMY, VOICE_RADIUS } from '../core/config.js';
 import { SFX } from '../audio/audio.js';
 import { gun } from '../weapons/guns.js';
 import { refreshEnemyParts } from './soldiers.js';
@@ -13,8 +13,10 @@ import { stopConversation } from './chatter.js';
 let lastShout = -9;
 export function shoutFrom(e, word, prob = 1) {
   if (!e.alive || Math.random() > prob || S.time - lastShout < 1.2) return;
+  const d = Math.hypot(e.x - player.x, e.z - player.z);
+  if (d > VOICE_RADIUS) return;   // out of earshot: no callout, not even the speech fallback
   lastShout = S.time;
-  if (SFX.shout(Math.hypot(e.x - player.x, e.z - player.z))) return;
+  if (SFX.shout(d)) return;
   if (!('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(word);
   u.lang = 'de-DE'; u.pitch = 0.45; u.rate = 0.95; u.volume = 0.9;

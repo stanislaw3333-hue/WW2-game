@@ -2,12 +2,12 @@
 // the procedural sound effects (noise and tone bursts) and the ambient drone.
 import * as THREE from 'three';
 import { clamp } from '../core/util.js';
-import { RADIO } from '../core/config.js';
+import { RADIO, CHATTER_RADIUS, K98_RELOAD_SPLIT_T, K98_RELOAD_COCK_T } from '../core/config.js';
 import { CLIPS } from './clips.js';
 
 let AC = null, master, echoIn, noiseBuf, radioPanner = null;
 // decoded sample buffers; null until loaded (every sound falls back to its procedural version)
-const BUF = { kar98Shot: null, kar98Reload: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, shouts: [], convos: [] };
+const BUF = { kar98Shot: null, kar98Reload: null, kar98Rechamber: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, footstep: null, shouts: [], convos: [] };
 const SIREN_GAIN = 0.3;   // background air siren level under the drone
 const RADIO_GAIN = 1.1;   // German radio set level at its reference distance
 
@@ -48,6 +48,8 @@ function loadClips() {
   load(CLIPS.siren).then(b => { if (!b) return; BUF.siren = b; startSiren(); });
   load(CLIPS.radio).then(b => { if (!b) return; BUF.radio = b; startRadio(); });
   load(CLIPS.grenade).then(b => { BUF.grenade = b; });
+  load(CLIPS.footstep).then(b => { BUF.footstep = b; });
+  load(CLIPS.kar98Rechamber).then(b => { BUF.kar98Rechamber = b; });
   CLIPS.shouts.forEach(u => load(u).then(b => { if (b) BUF.shouts.push(b); }));
   CLIPS.convos.forEach(u => load(u).then(b => { if (b) BUF.convos.push(b); }));
 }
@@ -97,10 +99,18 @@ function playBuf(buf, gain, rate = 1) {
   s.connect(g); g.connect(master); s.start();
   return true;
 }
+// plays `len` seconds of a buffer from `from`, starting `delay` seconds from now
+function playSlice(buf, gain, from, len, delay = 0) {
+  if (!AC || !buf) return false;
+  const s = AC.createBufferSource(), g = AC.createGain();
+  s.buffer = buf; g.gain.value = gain;
+  s.connect(g); g.connect(master); s.start(AC.currentTime + delay, from, len);
+  return true;
+}
 // one spoken line from a German soldier `dist` metres away: quiet when far, louder as he comes closer.
 // Returns the source node (so combat can cut it off) and the line's length in seconds, or null if no audio.
 export function playConvoLine(dist) {
-  if (!AC || !BUF.convos.length) return null;
+  if (!AC || !BUF.convos.length || dist > CHATTER_RADIUS) return null;
   const buf = BUF.convos[(Math.random() * BUF.convos.length) | 0];
   const s = AC.createBufferSource(), g = AC.createGain();
   s.buffer = buf; g.gain.value = clamp(0.8 / (1 + dist * 0.35), 0, 0.8);
@@ -215,14 +225,32 @@ export const SFX = {
   autoFire: on => setAutoFire(on),
   autoFireReady: () => autoFireReady(),
   // reload sample for a weapon id ('k98' or 'mp40'); the animation keeps its own timing for the ammo refill
-  reload(id) { playBuf(id === 'k98' ? BUF.kar98Reload : BUF.mp40Reload, 0.9); },
+  reload(id) {
+    if (id === 'k98' && BUF.kar98Reload) {
+      // first section as the bolt is pulled back; second section when it cocks back. The split is the quiet gap in the clip (K98_RELOAD_SPLIT_T).
+      const b = BUF.kar98Reload, split = Math.min(K98_RELOAD_SPLIT_T, b.duration);
+      playSlice(b, 0.9, 0, split);
+      playSlice(b, 0.9, split, b.duration - split, K98_RELOAD_COCK_T);
+      return;
+    }
+    playBuf(id === 'k98' ? BUF.kar98Reload : BUF.mp40Reload, 0.9);
+  },
+  // Kar98 bolt cycle after each shot: the rechamber sample covers the whole action; without it, the old four clicks play
+  bolt() {
+    if (playBuf(BUF.kar98Rechamber, 0.9)) return;
+    SFX.click(0, 2400); SFX.click(0.18, 1700); SFX.click(0.5, 2000); SFX.click(0.68, 2900);
+  },
   // German callout from a random sample clip, quieter with distance; false if no clip is loaded yet
   shout(dist) {
     if (!BUF.shouts.length) return false;
     return playBuf(BUF.shouts[(Math.random() * BUF.shouts.length) | 0], clamp(0.9 / (1 + dist * 0.12), 0.12, 0.9));
   },
   click(d = 0, f = 2600) { sfxNoise({ type: 'bandpass', f0: f, q: 3, dur: 0.05, gain: 0.45, delay: d }); sfxTone(f * 0.4, f * 0.2, 0.03, 0.12, 'square', d); },
-  step(alt) { sfxNoise({ f0: alt ? 420 : 340, f1: 120, dur: 0.11, gain: 0.26 }); sfxNoise({ type: 'bandpass', f0: 1800, q: 1, dur: 0.035, gain: 0.05 }); },
+  // one footstep on the stone: the concrete sample, sped up 50% when sprinting; the procedural step is the fallback
+  step(alt, sprint = false) {
+    if (playBuf(BUF.footstep, 0.6, sprint ? 1.5 : 1)) return;
+    sfxNoise({ f0: alt ? 420 : 340, f1: 120, dur: 0.11, gain: 0.26 }); sfxNoise({ type: 'bandpass', f0: 1800, q: 1, dur: 0.035, gain: 0.05 });
+  },
   wood() { sfxNoise({ type: 'bandpass', f0: 520, q: 2.5, dur: 0.14, gain: 0.7, echo: 0.2 }); sfxTone(240, 110, 0.1, 0.3, 'triangle'); },
   stone() { sfxNoise({ type: 'bandpass', f0: 2400, q: 2, dur: 0.09, gain: 0.35, echo: 0.2 }); if (Math.random() < 0.4) sfxTone(2600 + Math.random() * 900, 900, 0.3, 0.07, 'sine', 0.02); },
   pickup() { sfxTone(520, 520, 0.08, 0.2, 'square'); sfxTone(780, 780, 0.12, 0.2, 'square', 0.09); SFX.click(0.02, 1800); },

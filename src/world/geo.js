@@ -100,7 +100,8 @@ export function win(face, x, z, w, y0, y1, material) {
 // round arch filling the top of a 3 m opening in a 1 m thick, 4.5 m high wall
 export function addArch(cx, cz, alongZ) {
   const sh = new THREE.Shape(); sh.moveTo(-1.5, 4.5); sh.lineTo(-1.5, 2.6); sh.absarc(0, 2.6, 1.5, Math.PI, 0, true); sh.lineTo(1.5, 4.5); sh.lineTo(-1.5, 4.5);
-  const g = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, curveSegments: 12 }); g.translate(0, 0, -0.5);
+  // 1.02 deep, not 1: the arch's faces must sit proud of the wall faces, or the two z-fight and the arch flickers
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 1.02, bevelEnabled: false, curveSegments: 12 }); g.translate(0, 0, -0.51);
   if (alongZ) g.rotateY(Math.PI / 2);
   g.translate(cx, 0, cz); worldUV(g, 3, 0, 0, 0);
   const m = new THREE.Mesh(g, M.stone); scene.add(m); shootables.push(m);
@@ -110,7 +111,8 @@ export function addArch(cx, cz, alongZ) {
   if (alongZ) g2.rotateY(Math.PI / 2);
   g2.translate(cx, 0, cz); worldUV(g2, 1.2, 0, 0, 0);
   scene.add(new THREE.Mesh(g2, M.stoneDark));
-  for (const sgn of [-1, 1]) { const o = sgn * 1.61; addBox(alongZ ? cx : cx + o, 0, alongZ ? cz + o : cz, alongZ ? 1.16 : 0.22, 2.6, alongZ ? 0.22 : 1.16, M.stoneDark, DECO); }
+  // jamb pillars sit 1 cm proud of the wall faces (1.60, not 1.61): flush faces z-fight with the wall and flicker
+  for (const sgn of [-1, 1]) { const o = sgn * 1.60;addBox(alongZ ? cx : cx + o, 0, alongZ ? cz + o : cz, alongZ ? 1.16 : 0.22, 2.6, alongZ ? 0.22 : 1.16, M.stoneDark, DECO); }
 }
 // buttress pier against a wall face; (nx,nz) points away from the wall
 export function pier(x, z, nx, nz) {
