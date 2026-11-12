@@ -70,9 +70,10 @@ import death_08 from './clips/german_death_08.wav';
 import death_09 from './clips/german_death_09.wav';
 import death_10 from './clips/german_death_10.wav';
 import planeFlyby from './clips/plane_flyby.mp3';   // small propeller plane flyby (courtyard-assets audio/Vehicles)
+import bomberFlyby from './clips/bomber_flyby.mp3'; // bomber flyby (courtyard-assets audio/Vehicles, kalsstockmedia-small-propeller-plane-flyby-3-341992)
 
 export const CLIPS = {
-  kar98Shot, kar98Reload, kar98Rechamber, mp40Shot, mp40Reload, siren, radio, grenade, footstep, planeFlyby,
+  kar98Shot, kar98Reload, kar98Rechamber, mp40Shot, mp40Reload, siren, radio, grenade, footstep, planeFlyby, bomberFlyby,
   shouts: [
     shout_01,
     shout_02,

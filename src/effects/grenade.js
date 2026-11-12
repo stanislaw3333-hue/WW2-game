@@ -4,17 +4,19 @@
 import * as THREE from 'three';
 import { V3 } from '../core/util.js';
 import { S, player, enemies, boxes, circles } from '../core/state.js';
-import { GRENADE } from '../core/config.js';
+import { GRENADE, HEARING } from '../core/config.js';
 import { scene, camera } from '../render/renderer.js';
 import { M, T } from '../render/materials.js';
 import { SFX } from '../audio/audio.js';
 import { gun } from '../weapons/guns.js';
 import { hitEnemy, hurtPlayer, alertEnemy } from '../enemies/combat.js';
+import { noise } from '../enemies/hearing.js';
 import { spawnParts } from './fx.js';
 
 const R = GRENADE.radius, GROUND = 0.05, RAD = 0.05;   // blast radius; grenade rests on the ground at this height; collision radius
 const UP = new V3(0, 1, 0);
 const live = [], spare = [];      // grenades in flight, and recycled models
+export const liveGrenades = live; // read by the soldiers, who run from them (enemies/tactics.js)
 
 // a stick grenade: metal canister on top of a wooden handle, tumbling as it flies
 function makeNade() {
@@ -29,11 +31,16 @@ function makeNade() {
 // release from the throwing hand, along the view direction, when the throw animation reaches its release frame
 export function launchGrenade() {
   const dir = camera.getWorldDirection(new V3());
-  const g = spare.pop() || makeNade();
   const right = new V3().crossVectors(dir, camera.up).normalize();   // to the player's right
   const [ox, oy, oz] = GRENADE.releaseOffset;
-  g.p.copy(camera.position).addScaledVector(right, ox).addScaledVector(dir, oz); g.p.y += oy;
-  g.v.copy(dir).multiplyScalar(GRENADE.throwSpeed); g.v.y += GRENADE.throwLift;
+  const p = camera.position.clone().addScaledVector(right, ox).addScaledVector(dir, oz); p.y += oy;
+  const v = dir.clone().multiplyScalar(GRENADE.throwSpeed); v.y += GRENADE.throwLift;
+  launchGrenadeAt(p, v);
+}
+// a grenade from any hand: start point p and velocity v (V3s); the fuse starts now. Enemy grenadiers use this too.
+export function launchGrenadeAt(p, v) {
+  const g = spare.pop() || makeNade();
+  g.p.copy(p); g.v.copy(v);
   g.fuse = GRENADE.fuse; g.mesh.visible = true; g.mesh.position.copy(g.p);
   live.push(g);
 }
@@ -113,17 +120,18 @@ function explode(p) {
   spawnParts(p, UP, M.dust, 18);       // dust cloud
   spawnParts(p, UP, M.chip, 12);       // splinters and grit
   spawnParts(p, UP, M.puff, 6);        // dark smoke
-  // soldiers: full damage at the centre, falling off to nothing at the edge; anyone close enough to hear it is alerted
+  // soldiers: full damage at the centre, falling off to nothing at the edge; anyone close is alerted, further out aware (HEARING.grenade)
   for (const e of enemies) {
     if (!e.alive) continue;
     const d = Math.hypot(e.x - p.x, e.z - p.z);
     if (d < R) hitEnemy(e, 'body', GRENADE.enemyDmg * (1 - d / R));
-    else if (d < R * 3.5) alertEnemy(e, false);
+    else if (d < R * 2) alertEnemy(e, false);
   }
+  noise(p.x, p.z, HEARING.grenade, p.y + 0.5);
   // the player: the blast reaches the body's centre, not just the feet, and shakes the view
   if (S.state === 'play') {
     const d = Math.hypot(player.x - p.x, player.y + 0.9 - p.y, player.z - p.z);
-    if (d < R) hurtPlayer(GRENADE.playerDmg * (1 - d / R));
+    if (d < R) hurtPlayer(GRENADE.playerDmg * (1 - d / R), p.x, p.z);
     if (d < R * 2) gun.camKick = Math.max(gun.camKick, 1 - d / (R * 2));
   }
 }

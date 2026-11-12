@@ -6,7 +6,7 @@ import { scene } from '../render/renderer.js';
 const BASE_DIST = 50;      // m from the courtyards to the searchlight bases (just outside the walls; beams about 1/3 of the old length)
 const BEAM_LEN = 260;      // m: geometry length, scaled per frame to reach the aim point
 const BEAM_R = 2.25;       // m: radius at the far (sky) end (half the old 4.5, per the notes)
-const AIM_C = new THREE.Vector3(-30, 45, 0);    // the area the beams sweep around, above the yards: raised so the beam tips stay in the sky (half the drop, per the notes)
+const AIM_C = new THREE.Vector3();    // set from the level (levels/<id>/data.js searchlights.aim): the area the beams sweep around, above the yards: raised so the beam tips stay in the sky (half the drop, per the notes)
 const AIM_SPAN = 20;       // m: how far each beam's aim point wanders from AIM_C
 
 // the moon sits to the north-east of the manor yard; the searchlights stand on the opposite bearing
@@ -28,7 +28,8 @@ function beamTex() {
 const beams = [];
 const up = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3(), aim = new THREE.Vector3();
 
-export function buildSearchlights() {
+export function buildSearchlights({ aim: c }) {
+  AIM_C.set(...c);
   const mat = new THREE.MeshBasicMaterial({
     map: beamTex(), color: 0xdfe8ff, transparent: true, opacity: 0.12,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,

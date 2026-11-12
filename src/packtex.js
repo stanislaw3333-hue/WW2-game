@@ -16,6 +16,12 @@ import treeA from './pack/tree_foliage_a.png';          // tex1_256x128_3c27a77a
 import treeB from './pack/tree_foliage_b.png';          // tex1_256x128_7d52d6ac83ef1721_765591499361d3c2_8
 import radio from './pack/radio.png';                   // tex1_128x128_fab07a580d84dbdb_14
 import soldierSheet from './pack/soldier_sheet.png';    // tex1_256x256_ce1e2eb5faa0f5c0_14: uniform + helmet atlas
+// uniform sheets for the other soldier types (enemies/uniforms.js maps each onto the body)
+import sheetPanzergrenadier from './pack/soldier_panzergrenadier.png';   // tex1_256x256_fea098d61952c7c2_14
+import sheetSSOfficer from './pack/soldier_ss_officer.png';               // tex1_256x256_fd2d1643cc113d34_14
+import sheetLuftwaffeOfficer from './pack/soldier_luftwaffe_officer.png'; // tex1_256x256_f407b531e1815693_14
+import sheetEngineer from './pack/soldier_engineer.png';                  // tex1_256x256_ffd7118852bcfd57_14
+import sheetColonel from './pack/soldier_colonel.png';                    // tex1_256x256_769db0c61558036f_14
 import stone from './pack/stone_wall_tan_blocks.png';
 import stoneDark from './pack/brick_wall_dark.png';
 import plaster from './pack/plaster_wall_grey.png';
@@ -37,7 +43,7 @@ import skyNight from './pack/sky_night_moon.png';      // City Rooftop Night pan
 const FILES = {
   brickRough, facadeBrick, flagstone, ivy,
   windowLit, windowDark, flagBanner, crateWide, crateA, crateB,
-  treeA, treeB, radio, soldierSheet,
+  treeA, treeB, radio, soldierSheet, sheetPanzergrenadier, sheetSSOfficer, sheetLuftwaffeOfficer, sheetEngineer, sheetColonel,
   stone, stoneDark, plaster, roof, planks, dirt, doorPanels, flag, crateEagle, poster, gunwood, gunmetal,
   grenadeMetal, grenadeWood, skyNight, truckPolish, explosionSheet,
 };

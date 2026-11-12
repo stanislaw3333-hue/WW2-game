@@ -1,12 +1,12 @@
 // Manor yard (east courtyard): manor, stable, west wall + tower, south wall + gate, fountain, props, ammo crates.
 import * as THREE from 'three';
-import { V3 } from '../core/util.js';
-import { circles, shootables, lightDefs } from '../core/state.js';
-import { placeTruck } from './vehicles.js';
-import { scene, mat } from '../render/renderer.js';
-import { M, T } from '../render/materials.js';
-import { worldUV, addBox, addCyl, quad, tri, wallQuad, win, addArch, addLantern } from './geo.js';
-import { R, crate } from './props.js';
+import { V3 } from '../../core/util.js';
+import { circles, shootables, lightDefs } from '../../core/state.js';
+import { placeTruck } from '../../world/vehicles.js';
+import { scene, mat } from '../../render/renderer.js';
+import { M, T } from '../../render/materials.js';
+import { worldUV, addBox, addCyl, quad, tri, wallQuad, win, addArch, addLantern } from '../../world/geo.js';
+import { R, crate } from '../../world/props.js';
 
 export function buildYard1() {
   // ground

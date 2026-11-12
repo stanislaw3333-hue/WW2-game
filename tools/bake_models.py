@@ -10,8 +10,10 @@ argv = sys.argv[sys.argv.index("--") + 1:]
 out_path, cfg_name = argv[0], argv[1]
 CFG = {
     "k98": dict(length=1.23, rot=90, muzzle=1, origin_x=-0.337,
-                drop=["7.92x57", "79257", "79257 5rnd clip", "79257 5rnd clip empty", "bolt", "idk for bolt"],
-                mats={"1wo": "wood", "kar98 marking": "wood"}),
+                drop=["7.92x57", "79257", "79257 5rnd clip empty", "bolt", "idk for bolt"],
+                mats={"1wo": "wood", "kar98 marking": "wood"},
+                # the model's own five-round stripper clip, baked as separate meshes (steel strip, brass rounds) at its seated position so the reload can slide it
+                part_mats={"79257 5rnd clip|1b": "clip", "79257 5rnd clip|blt": "clipbrass"}),
     # parts: objects split out into their own mesh key so the game can move them (the MP40 bolt slides on its own)
     # only the outside side piece of bolt detail #0 moves (found by its island bounds); the slide, its knob and everything else on the gun stay fixed
     "mp40": dict(length=0.80, rot=-90, muzzle=-1, origin_x=0.137,
@@ -30,6 +32,8 @@ CFG = {
     # Junkers Ju87: length along X (the fuselage, 11 m); bake_plane.py turns the nose onto X first. Its materials
     # all bake to the default key ("metal") and the game colours them dark itself.
     "ju87": dict(length=11.0, rot=None, muzzle=None, origin_x=None, drop=[], mats={}),
+    # Junkers Ju52 (junkers-ju-52.zip, glTF): real length 18.9 m, along X, nose +X. Same single "metal" key as the Ju87 so it takes the same dark colour.
+    "ju52": dict(length=18.9, rot=None, muzzle=None, origin_x=None, drop=[], mats={}),
     "pz1": dict(length=5.4, rot=None, muzzle=None, origin_x=None, drop=[],
                 mats={"gray": "armor", "black": "tire"}),
     "pg": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry",
@@ -40,12 +44,30 @@ CFG = {
                       "scrimleaves_low": "helmet", "ammopouchesgerman_low": "leather"}),
     # German soldier FBX (Mixamo-style rig, no "mixamorig:" prefix). The wrapper script names the material
     # slots "uniform" (Soldier_1) and "helmet" (Helmet) before this runs. Its UVs index german_soldier_tex.
-    "gs": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry", prefix="", chain=3,
+    # gun="k98" / "mp40": both hands go to the same grip points on that gun as the player's hands (GRIPS below), so the
+    # enemy holds each gun the way the player does. gs / gsa = carried / shouldered Kar98; gs_mp40 / gsa_mp40 the same with the MP40.
+    "gs": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry", prefix="", chain=3, gun="k98",
                mats={"uniform": "uniform", "helmet": "helmet"}),
     # aim: trigger elbow drops low and back, support elbow low and out (the reference shouldering pose)
-    "gsa": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="aim", prefix="", chain=3,
+    "gsa": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="aim", prefix="", chain=3, gun="k98",
                 pole_r=(-0.45, 0.85, -0.3), pole_l=(0.5, 0.85, 0.1),
                 mats={"uniform": "uniform", "helmet": "helmet"}),
+    "gs_mp40": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry", prefix="", chain=3, gun="mp40",
+                    mats={"uniform": "uniform", "helmet": "helmet"}),
+    "gsa_mp40": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="aim", prefix="", chain=3, gun="mp40",
+                     pole_r=(-0.45, 0.85, -0.3), pole_l=(0.5, 0.85, 0.1),
+                     mats={"uniform": "uniform", "helmet": "helmet"}),
+    # Stielhandgranate throw, three poses (hands as [right, left] targets in game body space, three.js axes, metres): the grenade
+    # held at the chest, the arm cocked back over the shoulder, and the arm swung forward at release. The free hand balances.
+    "ng_hold": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="free", prefix="", chain=3,
+                    hands=[(-0.20, 1.18, 0.30), (0.26, 0.92, 0.08)], pole_r=(-0.55, 1.0, 0.0), pole_l=(0.6, 1.0, -0.2),
+                    mats={"uniform": "uniform", "helmet": "helmet"}),
+    "ng_wind": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="free", prefix="", chain=3,
+                    hands=[(-0.28, 1.78, -0.26), (0.30, 1.30, 0.36)], pole_r=(-0.7, 1.55, -0.35), pole_l=(0.6, 1.1, 0.1),
+                    mats={"uniform": "uniform", "helmet": "helmet"}),
+    "ng_throw": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="free", prefix="", chain=3,
+                     hands=[(-0.18, 1.52, 0.57), (0.26, 0.95, 0.05)], pole_r=(-0.5, 1.25, 0.2), pole_l=(0.6, 1.0, -0.1),
+                     mats={"uniform": "uniform", "helmet": "helmet"}),
 }[cfg_name]
 BONE = CFG.get("prefix", "mixamorig:")
 
@@ -90,6 +112,17 @@ if CFG.get("pose"):
         RIGHT = Vector((0.0, 1.07, 0.2))
         rot = Matrix.Rotation(0.65, 3, 'Y') @ Matrix.Rotation(0.45, 3, 'X')
     LEFT = RIGHT + rot @ Vector((0.0, 0.0, 0.2))
+    if CFG.get("hands"):                       # explicit hand targets in body space (the grenade poses)
+        RIGHT, LEFT = Vector(CFG["hands"][0]), Vector(CFG["hands"][1])
+    elif CFG.get("gun"):
+        # the player's grip points on the gun (gun space, muzzle along -Z): the enemy gun is the same model turned half a circle
+        # about Y and moved 0.08 m (rifleM in addEnemy), then placed in the body by the pose's rifle position and rotation
+        GRIPS = {"k98": dict(R=(0.086, -0.053, 0.185), L=(-0.034, -0.057, -0.22)),     # HAND_OFFSETS p + d for each hand
+                 "mp40": dict(R=(0.099, -0.089, 0.271), L=(-0.052, -0.133, -0.071))}
+        def grip_to_body(g):
+            return RIGHT_ORIGIN + rot @ Vector((-g[0], g[1], -g[2] + 0.08))
+        RIGHT_ORIGIN = RIGHT
+        RIGHT, LEFT = grip_to_body(GRIPS[CFG["gun"]]["R"]), grip_to_body(GRIPS[CFG["gun"]]["L"])
     arm = bpy.data.objects["Armature"]
     scn = bpy.context.scene
     for side, tgt, pole, bone in [("R", RIGHT, CFG.get("pole_r", (-0.55, 1.2, 0.0)), BONE + "RightHand"),
@@ -116,7 +149,7 @@ for o, eo, me in meshes:
     for tri in me.loop_triangles:
         slot = o.material_slots[tri.material_index] if tri.material_index < len(o.material_slots) else None
         mname = slot.material.name if slot and slot.material else "none"
-        key = CFG.get("parts", {}).get(o.name) or CFG["mats"].get(mname, "metal")
+        key = CFG.get("part_mats", {}).get(o.name + "|" + mname) or CFG.get("parts", {}).get(o.name) or CFG["mats"].get(mname, "metal")
         # an object can move in part only: triangles centred inside a "moving" box go to the moving key, the rest of it stays fixed
         if o.name in CFG.get("moving_boxes", {}):
             c = sum((W @ me.vertices[me.loops[li].vertex_index].co for li in tri.loops), Vector((0, 0, 0))) / 3

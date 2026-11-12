@@ -10,7 +10,7 @@
     "check": "esbuild src/game.js --bundle --loader:.png=dataurl --loader:.mp3=dataurl --loader:.wav=dataurl --outfile=.check/game.js --log-level=warning && node -e \"console.log('check ok')\"",
     "exe": "bash build-exe.sh outputs",
     "serve": "node tools/serve.js app 8080",
-    "lint": "eslint --no-config-lookup --parser-options=ecmaVersion:latest --parser-options=sourceType:module --rule \"{'no-undef':'error','no-unused-vars':'warn'}\" --global window,document,fetch,location,performance,requestAnimationFrame,addEventListener,innerWidth,innerHeight,speechSynthesis,SpeechSynthesisUtterance,atob,setInterval,console,navigator,Image src",
+    "lint": "eslint --no-config-lookup --parser-options=ecmaVersion:latest --parser-options=sourceType:module --rule \"{'no-undef':'error','no-unused-vars':'warn'}\" --global window,document,fetch,location,performance,requestAnimationFrame,addEventListener,innerWidth,innerHeight,speechSynthesis,SpeechSynthesisUtterance,atob,setInterval,console,navigator,Image,URLSearchParams,setTimeout src",
     "test": "npm run check && npm run lint"
   },
   "keywords": [],

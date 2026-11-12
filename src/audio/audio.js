@@ -2,12 +2,13 @@
 // the procedural sound effects (noise and tone bursts) and the ambient drone.
 import * as THREE from 'three';
 import { clamp } from '../core/util.js';
-import { RADIO, RADIO_RANGE, CHATTER_RADIUS, DEATH_GAIN, FLYOVER, K98_RELOAD_SPLIT_T, K98_RELOAD_COCK_T } from '../core/config.js';
+import { LEVEL } from '../levels/index.js';
+import { RADIO_RANGE, CHATTER_RADIUS, DEATH_GAIN, K98_RELOAD_SPLIT_T, K98_RELOAD_COCK_T, ENEMY_HANDLING_GAIN } from '../core/config.js';
 import { CLIPS } from './clips.js';
 
 let AC = null, master, echoIn, noiseBuf, radioPanner = null;
 // decoded sample buffers; null until loaded (every sound falls back to its procedural version)
-const BUF = { kar98Shot: null, kar98Reload: null, kar98Rechamber: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, footstep: null, planeFlyby: null, shouts: [], convos: [], deaths: [] };
+const BUF = { kar98Shot: null, kar98Reload: null, kar98Rechamber: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, footstep: null, planeFlyby: null, bomberFlyby: null, shouts: [], convos: [], deaths: [] };
 const SIREN_GAIN = 0.3;   // background air siren level under the drone
 const RADIO_GAIN = 1.1;   // German radio set level at its reference distance
 
@@ -36,7 +37,7 @@ function initAudio() {
     w.connect(wl); wl.connect(wg); wg.connect(master); w.start();
     startDrone();
     loadClips();
-  } catch (e) { AC = null; }
+  } catch { AC = null; }
 }
 // decodes every sample clip once; each one is independent, so a failed clip only disables its own sound
 function loadClips() {
@@ -46,11 +47,12 @@ function loadClips() {
   load(CLIPS.mp40Shot).then(b => { BUF.mp40Shot = b; });
   load(CLIPS.mp40Reload).then(b => { BUF.mp40Reload = b; });
   load(CLIPS.siren).then(b => { if (!b) return; BUF.siren = b; startSiren(); });
-  load(CLIPS.radio).then(b => { if (!b) return; BUF.radio = b; startRadio(); });
+  load(CLIPS.radio).then(b => { if (!b || !LEVEL.RADIO) return; BUF.radio = b; startRadio(); });
   load(CLIPS.grenade).then(b => { BUF.grenade = b; });
   load(CLIPS.footstep).then(b => { BUF.footstep = b; });
   load(CLIPS.kar98Rechamber).then(b => { BUF.kar98Rechamber = b; });
   load(CLIPS.planeFlyby).then(b => { BUF.planeFlyby = b; });
+  load(CLIPS.bomberFlyby).then(b => { BUF.bomberFlyby = b; });
   CLIPS.shouts.forEach(u => load(u).then(b => { if (b) BUF.shouts.push(b); }));
   CLIPS.convos.forEach(u => load(u).then(b => { if (b) BUF.convos.push(b); }));
   CLIPS.deaths.forEach(u => load(u).then(b => { if (b) BUF.deaths.push(b); }));
@@ -75,24 +77,28 @@ function startRadio() {
   // linear falloff: full level at 2 m, silent at RADIO_RANGE (the inverse model never reaches zero, so the radio was still audible at spawn)
   radioPanner.panningModel = 'HRTF'; radioPanner.distanceModel = 'linear';
   radioPanner.refDistance = 2; radioPanner.maxDistance = RADIO_RANGE; radioPanner.rolloffFactor = 1;
-  radioPanner.positionX.value = RADIO.x; radioPanner.positionY.value = RADIO.y + 0.2; radioPanner.positionZ.value = RADIO.z;
+  const R = LEVEL.RADIO; radioPanner.positionX.value = R.x; radioPanner.positionY.value = R.y + 0.2; radioPanner.positionZ.value = R.z;
   const g = AC.createGain(); g.gain.value = RADIO_GAIN;
   s.connect(radioPanner); radioPanner.connect(g); g.connect(master); s.start();
 }
-// propeller flyover: plays the clip from a point that the caller moves with the aircraft each frame. The falloff is
-// linear, so the sound is loudest when the plane is overhead. Returns { move(x, y, z), stop() }, or null if not loaded.
-export function playFlyby(x, y, z) {
-  if (!AC || !BUF.planeFlyby) return null;
-  const s = AC.createBufferSource(); s.buffer = BUF.planeFlyby;
+// propeller flyover: plays the named clip (BUF key: planeFlyby or bomberFlyby) from a point that the caller moves with
+// the aircraft each frame. cfg is that aircraft's config (refDist, maxDist, soundGain). The falloff is linear, so the
+// sound is loudest when the plane is overhead. Returns { move(x, y, z), done() }, or null if not loaded. The clip plays
+// to its end (done() turns true then); the caller keeps moving it until then.
+export function playFlyby(name, cfg, x, y, z) {
+  if (!AC || !BUF[name]) return null;
+  const s = AC.createBufferSource(); s.buffer = BUF[name];
+  let ended = false;
+  s.onended = () => { ended = true; };
   const p = AC.createPanner();
   p.panningModel = 'HRTF'; p.distanceModel = 'linear';
-  p.refDistance = FLYOVER.refDist; p.maxDistance = FLYOVER.maxDist; p.rolloffFactor = 1;
-  const g = AC.createGain(); g.gain.value = FLYOVER.soundGain;
+  p.refDistance = cfg.refDist; p.maxDistance = cfg.maxDist; p.rolloffFactor = 1;
+  const g = AC.createGain(); g.gain.value = cfg.soundGain;
   s.connect(p); p.connect(g); g.connect(master);
   const move = (px, py, pz) => { p.positionX.value = px; p.positionY.value = py; p.positionZ.value = pz; };
   move(x, y, z);
   s.start();
-  return { move, stop: () => { try { s.stop(); } catch { /* already ended */ } } };
+  return { move, done: () => ended };
 }
 // keeps the audio listener on the camera each frame so the radio pans and fades with the player's view
 const fwd = new THREE.Vector3();
@@ -183,6 +189,16 @@ function trimmedFire() {
   fireTrim = out;
   return out;
 }
+// enemy MP40 burst heard from `dist` metres: the trimmed burst sample chained 1-3 times (about 1 s each), quieter with distance.
+// Returns the burst's length in seconds (0 when the sample is not loaded, so the caller can fall back).
+const distGain = dist => clamp(1.1 / (1 + dist * 0.09), 0.12, 0.8);   // level of an enemy weapon sound `dist` metres away
+export function enemyBurst(dist) {
+  if (!AC || !BUF.mp40Shot) return 0;
+  const fb = trimmedFire(), k = 1 + ((Math.random() * 3) | 0), t0 = AC.currentTime + 0.01;
+  const g = AC.createGain(); g.gain.value = distGain(dist); g.connect(master);
+  for (let i = 0; i < k; i++) { const s = AC.createBufferSource(); s.buffer = fb; s.connect(g); s.start(t0 + i * fb.duration); }
+  return k * fb.duration;
+}
 // sinister ambient drone: detuned low voices with a dissonant minor second, a slowly swelling filter,
 // a distant drifting wail, a dark echo, and occasional low stings
 function startDrone() {
@@ -241,6 +257,7 @@ export const SFX = {
     sfxNoise({ f0: 5200, f1: 300, dur: 0.5, gain: 1.0, echo: 0.6 }); sfxNoise({ type: 'highpass', f0: 2500, dur: 0.07, gain: 0.5 }); sfxTone(170, 38, 0.24, 0.9);
   },
   autoFire: on => setAutoFire(on),
+  eburst: dist => enemyBurst(dist),
   autoFireReady: () => autoFireReady(),
   // reload sample for a weapon id ('k98' or 'mp40'); the animation keeps its own timing for the ammo refill
   reload(id) {
@@ -292,13 +309,31 @@ export const SFX = {
     if (playBuf(BUF.mp40Shot, 0.9, 0.98 + Math.random() * 0.04)) return;
     sfxNoise({ f0: 4200, f1: 480, dur: 0.17, gain: 0.72, echo: 0.3 }); sfxNoise({ type: 'highpass', f0: 3000, dur: 0.04, gain: 0.3 }); sfxTone(210, 70, 0.09, 0.5);
   },
-  eshot(dist) { const g = clamp(1.1 / (1 + dist * 0.09), 0.12, 0.8); sfxNoise({ f0: 3600, f1: 260, dur: 0.4, gain: g, echo: 0.5 }); sfxTone(150, 40, 0.2, g * 0.7); },
+  // enemy gunshot: the same samples the player's weapons use (Kar98 or MP40), quieter with distance; procedural fallback if not loaded
+  // enemy bolt cycle, reload and clip sounds: the player's samples, quieter with distance
+  // (the handling sounds are ENEMY_HANDLING_GAIN of the distance level: half as loud as the shots)
+  ebolt(dist) { playBuf(BUF.kar98Rechamber, distGain(dist) * ENEMY_HANDLING_GAIN); },
+  eclipIn(dist) { if (BUF.kar98Reload) playSlice(BUF.kar98Reload, distGain(dist) * ENEMY_HANDLING_GAIN, 0, Math.min(K98_RELOAD_SPLIT_T, BUF.kar98Reload.duration)); },
+  ereload(id, dist) {
+    const g = distGain(dist) * ENEMY_HANDLING_GAIN;
+    if (id === 'k98' && BUF.kar98Reload) {
+      const b = BUF.kar98Reload, split = Math.min(K98_RELOAD_SPLIT_T, b.duration);
+      playSlice(b, g, 0, split); playSlice(b, g, split, b.duration - split, K98_RELOAD_COCK_T);
+      return;
+    }
+    playBuf(id === 'k98' ? BUF.kar98Reload : BUF.mp40Reload, g);
+  },
+  eshot(dist, weapon = 'k98') {
+    const g = distGain(dist);
+    if (playBuf(weapon === 'mp40' ? BUF.mp40Shot : BUF.kar98Shot, g, 0.98 + Math.random() * 0.04)) return;
+    sfxNoise({ f0: 3600, f1: 260, dur: 0.4, gain: g, echo: 0.5 }); sfxTone(150, 40, 0.2, g * 0.7);
+  },
   hit() { sfxNoise({ type: 'bandpass', f0: 700, q: 1.5, dur: 0.09, gain: 0.5 }); },
   hurt() { sfxNoise({ f0: 300, f1: 80, dur: 0.18, gain: 0.8 }); sfxTone(110, 50, 0.2, 0.5, 'triangle'); },
   whiz() { sfxTone(2400, 900, 0.12, 0.07, 'sawtooth'); },
   thud(dist) { sfxNoise({ f0: 220, f1: 60, dur: 0.22, gain: clamp(0.7 / (1 + dist * 0.08), 0.08, 0.5) }); },
   // arm swinging through: a short rising air whoosh
-  grenadeThrow() { sfxNoise({ type: 'bandpass', f0: 400, f1: 1600, q: 1.2, dur: 0.28, gain: 0.35, attack: 0.05 }); },
+  grenadeThrow(level = 1) { sfxNoise({ type: 'bandpass', f0: 400, f1: 1600, q: 1.2, dur: 0.28, gain: 0.35 * level, attack: 0.05 }); },   // level < 1: an enemy's throw heard from a distance
   // detonation: the recorded blast when loaded, else a low noise crack with a falling body
   explode(dist) {
     const g = clamp(1.2 / (1 + dist * 0.1), 0.15, 1);

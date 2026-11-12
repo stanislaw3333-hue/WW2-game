@@ -1,7 +1,7 @@
 // Per-frame player update: look, movement, weapon state machine, reload and switch animation, and the viewmodel pose.
 import { V3, clamp, lerp, sstep } from '../core/util.js';
 import { S, say, player, keys } from '../core/state.js';
-import { PLAYER, GRENADE, K98_CLIP_IN_T } from '../core/config.js';
+import { PLAYER, FIRE, RELOAD, GRENADE, K98_CLIP_IN_T } from '../core/config.js';
 import { camera } from '../render/renderer.js';
 import { SFX } from '../audio/audio.js';
 import { G, WEAPONS, gun, curW } from '../weapons/guns.js';
@@ -15,7 +15,7 @@ function boltCycle(u) { // u 0..1 -> [rotation 0..1, pulled back 0..1]
 export function update(dt) {
   S.time += dt;
   // look
-  const sens = 0.0023 * lerp(1, 0.55, gun.ads);
+  const sens = PLAYER.mouseSens * lerp(1, PLAYER.adsSensMult, gun.ads);
   player.yaw -= S.mdx * sens; player.pitch = clamp(player.pitch - S.mdy * sens, -1.35, 1.35);
   const turn = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0);
   player.yaw += turn * 1.9 * dt;
@@ -42,7 +42,7 @@ export function update(dt) {
 
   // weapon state
   const w = curW();
-  gun.t += dt; gun.cool -= dt; gun.heat = Math.max(0, gun.heat - dt * 0.9); gun.boltT = Math.max(0, gun.boltT - dt);
+  gun.t += dt; gun.cool -= dt; gun.heat = Math.max(0, gun.heat - dt * FIRE.heatDecay); gun.boltT = Math.max(0, gun.boltT - dt);
   if (S.wantW >= 0) {
     if (gun.state === 'idle' && S.wantW !== gun.w) { gun.state = 'switch'; gun.t = 0; gun.next = S.wantW; gun.swapped = false; S.wantW = -1; }
     else if (gun.state !== 'fire') S.wantW = -1;
@@ -78,19 +78,19 @@ export function update(dt) {
       const p = gun.t - dt;
       if (p < 0.32 && gun.t >= 0.32) SFX.bolt();
       if (p < 0.5 && gun.t >= 0.5) { G.brass.visible = true; G.brassLife = 0.5; G.brass.scale.setScalar(1); G.brass.position.copy(w.m.root.position).add(new V3(0.03, 0.06, 0.05)); G.brassV.set(0.9 + Math.random() * 0.4, 1.3, 0.2); }
-      if (gun.t > 1.2) { gun.state = 'idle'; if (w.ammo === 0 && w.reserve > 0) tryReload(); }
+      if (gun.t > FIRE.rifleCycleT) { gun.state = 'idle'; if (w.ammo === 0 && w.reserve > 0) tryReload(); }
     } else if (gun.state === 'reload') {
       const t = gun.t, p = t - dt;
       low = sstep(0, 0.35, t) - sstep(2.3, 2.65, t);
       rot = sstep(0.35, 0.5, t) - sstep(1.95, 2.1, t); back = sstep(0.5, 0.7, t) - sstep(1.75, 1.95, t);
       // the reload sample (started in tryReload) carries the mechanical sounds; only the refill happens here
-      if (p < 1.35 && t >= 1.35) { const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
+      if (p < RELOAD.k98.refillT && t >= RELOAD.k98.refillT) { const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
       if (p < K98_CLIP_IN_T && t >= K98_CLIP_IN_T) SFX.clipIn();
       // stripper clip: hand brings it down onto the open receiver, rounds drop in, clip is discarded
       clipOn = t > 0.7 && t < 1.38;
       clipY = 0.13 - sstep(0.75, 1.05, t) * 0.083;
       press = sstep(0.75, 1.05, t) - sstep(1.2, 1.38, t);
-      if (t > 2.65) gun.state = 'idle';
+      if (t > RELOAD.k98.endT) gun.state = 'idle';
     }
   } else {
     back = gun.boltT / 0.1;
@@ -99,9 +99,9 @@ export function update(dt) {
       low = sstep(0, 0.3, t) - sstep(1.95, 2.3, t);
       // magazine swap: old magazine drops out, the fresh one rises into the well, then the bolt is charged
       mDrop = sstep(0.35, 0.8, t); mRise = sstep(0.9, 1.3, t); mSwap = t >= 0.9 && t < 1.35;
-      if (p < 1.28 && t >= 1.28) { const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
-      if (p < 1.7 && t >= 1.7) gun.boltT = 0.1;
-      if (t > 2.3) gun.state = 'idle';
+      if (p < RELOAD.mp40.refillT && t >= RELOAD.mp40.refillT) { const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
+      if (p < RELOAD.mp40.chargeT && t >= RELOAD.mp40.chargeT) gun.boltT = 0.1;
+      if (t > RELOAD.mp40.endT) gun.state = 'idle';
     } else if (gun.state === 'idle' && w.ammo === 0 && w.reserve > 0 && gun.cool <= -0.25) tryReload();
   }
   const cw = curW(), gm = cw.m;
@@ -120,6 +120,9 @@ export function update(dt) {
   gm.root.rotation.x += tilt;
   gm.root.position.y += fy - (fy * cs - fz * sn);
   gm.root.position.z += fz - (fy * sn + fz * cs);
+  // then the whole gun turns up about the eye by adsAim, putting the front sight on the screen centre
+  const pa = (cw.adsAim || 0) * a;
+  if (pa) { const py = gm.root.position.y, pz = gm.root.position.z, c2 = Math.cos(pa), s2 = Math.sin(pa); gm.root.position.y = py * c2 - pz * s2; gm.root.position.z = py * s2 + pz * c2; gm.root.rotation.x += pa; }
   if (cw.kind === 'grenade') {
     // overarm throw: the arm is raised high and back on the windup (head tipped back), then swings forward and down over the top through the release
     // the whole viewmodel turns about the bottom of the arm (GRENADE.pivot, in grenade space), like an arm swinging from the shoulder: up and back on the windup, forward on the swing

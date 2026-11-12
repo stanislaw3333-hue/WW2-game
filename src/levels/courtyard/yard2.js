@@ -1,15 +1,15 @@
 // Enemy yard (west courtyard) and the archway passage: walls, shut west gate, barracks, lamps, cover, props, Panzer I.
 import * as THREE from 'three';
-import { V3 } from '../core/util.js';
-import { boxes, shootables, lightDefs } from '../core/state.js';
-import PZ1_MODEL from '../models/pz1.json';
-import { scene, mat } from '../render/renderer.js';
-import { M, T } from '../render/materials.js';
-import { addBaked } from '../render/baked.js';
-import { worldUV, addBox, addCyl, quad, wallQuad, win, addArch, addLantern } from './geo.js';
-import { R, crate } from './props.js';
-import { RADIO } from '../core/config.js';
-import { placeTruck } from './vehicles.js';
+import { V3 } from '../../core/util.js';
+import { boxes, shootables, lightDefs } from '../../core/state.js';
+import PZ1_MODEL from '../../models/pz1.json';
+import { scene, mat } from '../../render/renderer.js';
+import { M, T } from '../../render/materials.js';
+import { addBaked } from '../../render/baked.js';
+import { worldUV, addBox, addCyl, quad, wallQuad, win, addArch, addLantern } from '../../world/geo.js';
+import { R, crate } from '../../world/props.js';
+import { RADIO } from './data.js';
+import { placeTruck } from '../../world/vehicles.js';
 
 export function buildYard2() {
   {

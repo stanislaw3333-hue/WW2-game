@@ -1,7 +1,7 @@
 // Per-frame world update: soldiers, practice targets, debris, light flicker and the nearest-light selection, water and sky.
 import { clamp, lerp, V3 } from '../core/util.js';
 import { S, lightDefs, player } from '../core/state.js';
-import { BUILDINGS } from '../core/config.js';
+import { LEVEL } from '../levels/index.js';
 import { camera } from '../render/renderer.js';
 import { worldL, gunL } from '../render/renderer.js';
 import { M } from '../render/materials.js';
@@ -17,7 +17,7 @@ import { gun } from '../weapons/guns.js';
 
 let skyFlash = 0, nextRumble = 6;
 const fwd = new V3();
-const inBuilding = (x, z) => BUILDINGS.some(b => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1);
+const inBuilding = (x, z) => LEVEL.indoors.some(b => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1);
 
 export function updateWorld(dt) {
   setSirenOutdoors(!inBuilding(player.x, player.z));

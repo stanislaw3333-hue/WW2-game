@@ -6,13 +6,19 @@ uniform vec3 uLPos[5]; uniform vec3 uLCol[5];
 uniform vec2 uFog; uniform vec3 uTint; uniform float uEmis; uniform float uAffine; uniform vec2 uUvOff;
 uniform float uShadeOn; uniform vec3 uShade;   // optional vertical shade: x = darkest factor, y = height where it starts, z = height where it is fully dark
 varying vec3 vUv3; varying vec3 vCol; varying float vFog;
+#include <skinning_pars_vertex>
 void main(){
-  vec4 wp = modelMatrix * vec4(position,1.0);
+  // skinning (three.js chunks; they do nothing unless the mesh is a SkinnedMesh, e.g. the rigged soldiers in enemies/rig.js)
+  vec3 transformed = position; vec3 objectNormal = normal;
+  #include <skinbase_vertex>
+  #include <skinnormal_vertex>
+  #include <skinning_vertex>
+  vec4 wp = modelMatrix * vec4(transformed,1.0);
   vec4 mv = viewMatrix * wp;
   vec4 p = projectionMatrix * mv;
   if(uSnapOn>0.5 && abs(p.w)>0.0001){ vec2 s = p.xy/p.w; s = floor(s*uSnap+0.5)/uSnap; p.xy = s*p.w; }
   gl_Position = p;
-  vec3 n = normalize(mat3(modelMatrix)*normal);
+  vec3 n = normalize(mat3(modelMatrix)*objectNormal);
   vec3 l = uAmbient + uSunCol*max(dot(n,uSunDir),0.0);
   for(int i=0;i<5;i++){
     vec3 d = uLPos[i]-wp.xyz; float dist = length(d);

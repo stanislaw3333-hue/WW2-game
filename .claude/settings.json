@@ -9,7 +9,10 @@
       "Read(./archive/**)",
       "Read(./src/models/*.json)",
       "Read(./package-lock.json)",
-      "Read(../courtyard-assets/**/*.zip)"
+      "Read(../courtyard-assets/**/*.zip)",
+      "Read(../courtyard-assets/**/*.rar)",
+      "Read(../courtyard-assets/**/*.fbx)",
+      "Read(../courtyard-assets/**/*.blend)"
     ]
   }
 }

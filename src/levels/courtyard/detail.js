@@ -1,6 +1,6 @@
 // Architectural detail on top of the main shells: cornices, pilasters, dormers, chimneys, buttress piers.
-import { M } from '../render/materials.js';
-import { addBox, wallQuad, pier, DECO } from './geo.js';
+import { M } from '../../render/materials.js';
+import { addBox, wallQuad, pier, DECO } from '../../world/geo.js';
 
 export function buildDetail() {
   const T4 = { ...DECO, tile: 4 };

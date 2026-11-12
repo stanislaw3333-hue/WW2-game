@@ -5,3 +5,4 @@ outputs/
 .check/
 app/game.js
 package-lock.json
+src/pack/

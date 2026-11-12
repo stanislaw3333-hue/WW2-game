@@ -196,7 +196,7 @@ export function capGeos() {
   const c = new THREE.LatheGeometry(prof.map(q => new THREE.Vector2(q[0], q[1])), 32); const p = c.attributes.position;
   for (let i = 0; i < p.count; i++) {
     let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const r = Math.hypot(x, z) || 1, a = Math.atan2(x, z), k = clamp((y - 0.05) / 0.05, 0, 1);
+    const a = Math.atan2(x, z), k = clamp((y - 0.05) / 0.05, 0, 1);
     y += k * 0.012 * Math.cos(2 * a);                                          // crown sags at the sides
     z = z * 1.2 - 0.004; p.setXYZ(i, x * (1 + 0.04 * k * Math.abs(Math.cos(a))), y, z);
   }

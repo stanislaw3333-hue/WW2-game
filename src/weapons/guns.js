@@ -2,7 +2,7 @@
 // the weapon table, and the gun state the player update drives.
 import * as THREE from 'three';
 import { V3 } from '../core/util.js';
-import { WEAPON_DEFS, FLASH_SIZE, HAND_OFFSETS, GUN_SCALE } from '../core/config.js';
+import { WEAPON_DEFS, FLASH_SIZE, HAND_OFFSETS, GUN_SCALE, K98_CLIP_SEAT_Y } from '../core/config.js';
 import { gunScene, gunL, mat } from '../render/renderer.js';
 import { T } from '../render/materials.js';
 import { addBaked } from '../render/baked.js';
@@ -42,6 +42,23 @@ export function setFlashFrame(mesh, i) {
   uv.needsUpdate = true;
 }
 
+// the player's muzzle flash (same sheet, same two planes) for an enemy gun: a front starburst plus a side streak along the barrel.
+// k scales it (the player's gun models are drawn 1.265x). Returns a hidden group at the muzzle; call randomizeFlash on every shot.
+let worldFlashMat = null;
+export function makeWorldFlash(parent, y, z, k = 1) {
+  const g = new THREE.Group(); g.position.set(0, y, z); g.visible = false; parent.add(g);
+  const f1 = new THREE.Mesh(new THREE.PlaneGeometry(0.3 * FLASH_SIZE * k, 0.3 * FLASH_SIZE * k), worldFlashMat);
+  const f2 = new THREE.Mesh(new THREE.PlaneGeometry(0.51 * FLASH_SIZE * k, 0.18 * FLASH_SIZE * k), worldFlashMat); f2.rotation.y = Math.PI / 2;
+  g.add(f1, f2); g.userData.f1 = f1; g.userData.f2 = f2; setFlashFrame(f1, 0); setFlashFrame(f2, 0);
+  return g;
+}
+// a new random frame, spin and size for the next shot, as the player's gun does
+export function randomizeFlash(g) {
+  const { f1, f2 } = g.userData, frame = (Math.random() * FLASH_FRAMES) | 0;
+  f1.rotation.z = Math.random() * 6.28; f1.scale.setScalar(0.8 + Math.random() * 0.5);
+  setFlashFrame(f1, frame); setFlashFrame(f2, frame);
+}
+
 export const G = {};   // ejected brass: mesh, velocity, remaining life
 export const WEAPONS = WEAPON_DEFS;   // stats live in core/config.js; runtime fields (m, ammo, reserve) are added to these objects
 
@@ -63,12 +80,12 @@ function buildGuns() {
   const muzzleTex = new THREE.TextureLoader().load(muzzleSheet, t => { flashCentres = measureFlashCentres(t.image); });   // sharp pixels, no mipmaps: keeps the PS1 look
   muzzleTex.magFilter = muzzleTex.minFilter = THREE.NearestFilter; muzzleTex.generateMipmaps = false;
   const fm = mat(muzzleTex, { ...o, additive: true, emis: 1 });
+  worldFlashMat = mat(muzzleTex, { additive: true, emis: 1, snap: false, side: THREE.DoubleSide });   // the same flash sheet for enemy guns, drawn in the world scene
   const add = (g, m, parent, x = 0, y = 0, z = 0) => { const b = new THREE.Mesh(g, m); b.position.set(x, y, z); parent.add(b); return b; };
   const prof = (pts, thick, m, parent, bevel) => add(profGeo(pts, thick, bevel), m, parent);
   // tube along the barrel axis from forward distance f0 to f1
   const tube = (r, f0, f1, y, m, parent, sides = 10, r1 = r) => { const g = new THREE.CylinderGeometry(r1, r, Math.abs(f1 - f0), sides); g.rotateX(-Math.PI / 2); uvScale(g, 2); return add(g, m, parent, 0, y, -(f0 + f1) / 2); };
   const cross = (r, len, x, y, f, m, parent, sides = 8) => { const g = new THREE.CylinderGeometry(r, r, len, sides); g.rotateZ(Math.PI / 2); return add(g, m, parent, x, y, -f); };
-  const box = (w, h, d, x, y, f, m, parent) => add(new THREE.BoxGeometry(w, h, d), m, parent, x, y, -f);
   const ball = (r, x, y, f, m, parent, sx = 1, sy = 1, sz = 1) => { const g = new THREE.SphereGeometry(r, 8, 6); g.scale(sx, sy, sz); return add(g, m, parent, x, y, -f); };
   // a hand and forearm from a baked hands model (its 'right' or 'left' part), in a group under root so the game can move it on its own
   // the pack's arm texture (UVs come from the bake); nearest filtering, no mipmaps, keeps the PS1 look
@@ -98,7 +115,8 @@ function buildGuns() {
   // ---- Karabiner 98k: body is the baked model; bolt, clip, hands and muzzle flash stay procedural so the reload still animates
   {
     const root = new THREE.Group(); gunScene.add(root); root.scale.setScalar(GUN_SCALE[0]);
-    addBaked(K98_MODEL, root, { wood, metal });
+    const brass = mat(T.brass, o);
+    const parts = addBaked(K98_MODEL, root, { wood, metal, clip: metal, clipbrass: brass });
     const bolt = new THREE.Group(); bolt.position.set(0, 0.008, -0.045); root.add(bolt);   // lowered and moved forward onto the receiver
     tube(0.0095, -0.05, 0.05, 0, metal, bolt, 8);
     tube(0.011, -0.075, -0.045, 0, dark, bolt, 8);
@@ -107,11 +125,11 @@ function buildGuns() {
     const left = hands(root, K98_HANDS, 'left', 0);
     const right = hands(root, K98_HANDS, 'right', 0);
     const [flash, flash2] = flashes(root, -0.767, 0.004);   // centred on the muzzle tip, measured on the viewmodel; a little lower than before
-    // stripper clip: five cartridges standing in a steel strip, pressed down into the receiver during reload
+    // stripper clip: the model's own five-round clip (baked as 'clip' and 'clipbrass' parts), pressed down into the receiver during reload.
+    // update.js moves `clip` from 0.13 m down to 0.047 m; clipIn lifts the baked clip so that end point lands K98_CLIP_SEAT_Y above its baked place.
     const clip = new THREE.Group(); root.add(clip); clip.visible = false;
-    const brass = mat(T.brass, o);
-    box(0.011, 0.003, 0.094, 0, 0, 0.01, metal, clip);
-    for (let i = 0; i < 5; i++) add(new THREE.CylinderGeometry(0.0055, 0.0055, 0.03, 8), brass, clip, 0, -0.016, -(0.01 + (i - 2) * 0.0185));
+    const clipIn = new THREE.Group(); clip.add(clipIn); clipIn.position.y = K98_CLIP_SEAT_Y - 0.047;
+    K98_MODEL.meshes.forEach((m, i) => { if (m.mat === 'clip' || m.mat === 'clipbrass') clipIn.add(parts[i]); });
     WEAPONS[0].m = { root, bolt, left, right, flash, flash2, clip };
   }
 

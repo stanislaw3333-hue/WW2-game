@@ -1,5 +1,6 @@
 // Session flow: starting or restarting a run, and the pointer lock that captures the mouse.
 import { PLAYER } from './core/config.js';
+import { LEVEL } from './levels/index.js';
 import { S, say, player, enemies } from './core/state.js';
 import { canvas } from './render/renderer.js';
 import { startAudio } from './audio/audio.js';
@@ -12,7 +13,7 @@ export function start() {
   if (S.state === 'dead') { if (S.deadT < 1.2) return; resetGame(); }
   S.state = 'play';
   // if the browser refuses pointer lock, S.noLock turns on and mouse look uses raw movement instead
-  try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { S.noLock = true; }); } catch (e) { S.noLock = true; }
+  try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { S.noLock = true; }); } catch { S.noLock = true; }
 }
 // reset the whole level from the pause screen and carry on playing
 export function restartLevel() {
@@ -20,11 +21,11 @@ export function restartLevel() {
   start();
 }
 function resetGame() {
-  Object.assign(player, { x: PLAYER.spawn.x, z: PLAYER.spawn.z, y: 0, vy: 0, yaw: PLAYER.spawnYaw, pitch: 0, hp: PLAYER.maxHp, hurt: 0, lastHit: -99 });
+  Object.assign(player, { x: LEVEL.spawn.x, z: LEVEL.spawn.z, y: 0, vy: 0, yaw: LEVEL.spawn.yaw, pitch: 0, hp: PLAYER.maxHp, hurt: 0, lastHit: -99 });
   for (const w of WEAPONS) { w.ammo = w.mag; w.reserve = w.max; }
   gun.state = 'idle'; gun.t = 0; gun.cool = 0; gun.kick = 0; gun.camKick = 0; gun.thrown = false;
   clearGrenades();
-  enemies.forEach(resetEnemy); refreshEnemyParts(); S.kills = 0; S.zoneMsg = 0;
+  enemies.forEach(resetEnemy); refreshEnemyParts(); S.kills = 0;
   for (const e of enemies) { e.g.position.set(e.x, 0, e.z); e.g.rotation.y = e.yaw; }
   say('TRY AGAIN', 2.5);
 }

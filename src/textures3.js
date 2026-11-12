@@ -1,7 +1,6 @@
 // Detailed textures for the German soldiers: uniforms (field-grey + dark), faces, helmet, cap, leather, kit.
 import { tex, blotch, rng } from './textures.js';
 
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const col = (c, v) => [c[0] * v, c[1] * v, c[2] * v];
 
 // woven cloth value: fine twill + blotchy wear + per-pixel noise
@@ -68,7 +67,6 @@ function makeFace(seed, tone, hair, eye, o = {}) {
   T.head = tex(128, 64, P => {
     const rr = rng(seed), b = blotch(rng(seed + 1), 8), b2 = blotch(rng(seed + 2), 20);
     const hairAt = (x, y) => {
-      const dx = Math.abs(((x + 64) % 128) - 64 - 32 + 32 - 32);                        // distance from the face centre (x = 32), wrapped
       const dd = Math.min(Math.abs(x - 32), 128 - Math.abs(x - 32));
       const hl = dd < 15 ? 17 + dd * 0.13 : dd < 23 ? 19 + (dd - 15) * 1.4 : 30;       // hairline: forehead, temples, then above the ears
       if (y < hl) return 1;
@@ -89,7 +87,7 @@ function makeFace(seed, tone, hair, eye, o = {}) {
     const px = (x, y, c) => P.setc(x, y, c[0], c[1], c[2]);
     const mulr = (x0, y0, x1, y1, f) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) P.mul(x, y, f); };
     // cheeks flush, temples, under-eye
-    for (const cx of [24, 40]) for (let y = 34; y < 46; y++) for (let x = cx - 5; x < cx + 6; x++) { const d = Math.hypot(x - cx, (y - 40) * 1.2); if (d < 5) { const i = (y * 128 + x) * 4; px(x, y, [tone[0] * (1.02 + 0.06 * (1 - d / 5)), tone[1] * (0.93 - 0.05 * (1 - d / 5)), tone[2] * (0.92 - 0.05 * (1 - d / 5))]); } }
+    for (const cx of [24, 40]) for (let y = 34; y < 46; y++) for (let x = cx - 5; x < cx + 6; x++) { const d = Math.hypot(x - cx, (y - 40) * 1.2); if (d < 5) { px(x, y, [tone[0] * (1.02 + 0.06 * (1 - d / 5)), tone[1] * (0.93 - 0.05 * (1 - d / 5)), tone[2] * (0.92 - 0.05 * (1 - d / 5))]); } }
     // forehead lines
     for (const y of [21, 23]) for (let x = 24; x <= 40; x++) if (rr() < 0.8) P.mul(x, y, 0.93);
     // eyes (viewer-left eye = x 21..28, other = x 36..43): lid, white, iris, pupil, lower lid shadow

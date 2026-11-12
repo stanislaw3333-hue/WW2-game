@@ -5,6 +5,7 @@ import { upgradeTextures } from '../textures2.js';
 import { packTextures, derivedTextures } from '../packtex.js';
 import { soldierTextures } from '../textures3.js';
 import { mat } from './renderer.js';
+import { SOLDIER_TYPES } from '../enemies/uniforms.js';
 
 export const T = derivedTextures(soldierTextures(packTextures(upgradeTextures(makeTextures()))));
 // the Polish truck's picture is smoothed (linear filter) so its wheels and headlights are not blocky; it is used by that truck only
@@ -56,6 +57,9 @@ export const SM = (() => {
     shadow: mat(T.sFelt, o),
     boot: mat(T.sBoot, o), leather: mat(T.sLeather, o), belt: mat(T.sBelt, o), metal: mat(T.sMetal, o), felt: mat(T.sFelt, o), canvas: mat(T.sCanvas, o),
     // helmet: black metal cut from the sheet's dark corner
+    // soldier types (enemies/uniforms.js): each type's uniform sheet with its tint; head = the Infantry sheet (shadowy face) for every type
+    types: Object.fromEntries(Object.entries(SOLDIER_TYPES).map(([k, t]) => [k, mat(T[t.sheet], { ...o, tint: t.tint })])),
+    head: mat(T.soldierSheet, { ...o, tint: SOLDIER_TYPES.infantry.tint }),
     stahl: mat(T.helmetBlack, od), cap: mat(T.sCap, od), band: mat(T.sBand, o), peak: mat(T.sPeak, od),
   };
 })();

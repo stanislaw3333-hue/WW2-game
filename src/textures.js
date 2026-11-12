@@ -144,7 +144,6 @@ function planks(P, r, pw, base, vertical = true, gap = 0.45) {
 
 export function makeTextures() {
   const T = {};
-  let r = rng(11);
 
   T.white = tex(4, 4, P => P.fill(() => [255, 255, 255]));
 
