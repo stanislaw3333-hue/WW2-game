@@ -49,3 +49,4 @@ if (TEST) window.__g = {
   player, gun, keys, start, enemies, WEAPONS, fire: () => { S.firePressed = true; }, hold: v => { S.fireHeld = v; }, setAds: v => { S.adsHeld = v; },
   reload: tryReload, hideGun: v => { S.hideGunT = v; }, weapon: i => { S.wantW = i; }, hurt: hurtPlayer, get state() { return S.state; }, get kills() { return S.kills; },
 };
+if (TEST) import('./debug/handtune.js');   // hand tuning mode: press H in the game (see the file header)

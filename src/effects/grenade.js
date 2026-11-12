@@ -30,7 +30,9 @@ function makeNade() {
 export function launchGrenade() {
   const dir = camera.getWorldDirection(new V3());
   const g = spare.pop() || makeNade();
-  g.p.copy(camera.position).addScaledVector(dir, 0.5); g.p.y -= 0.15;
+  const right = new V3().crossVectors(dir, camera.up).normalize();   // to the player's right
+  const [ox, oy, oz] = GRENADE.releaseOffset;
+  g.p.copy(camera.position).addScaledVector(right, ox).addScaledVector(dir, oz); g.p.y += oy;
   g.v.copy(dir).multiplyScalar(GRENADE.throwSpeed); g.v.y += GRENADE.throwLift;
   g.fuse = GRENADE.fuse; g.mesh.visible = true; g.mesh.position.copy(g.p);
   live.push(g);

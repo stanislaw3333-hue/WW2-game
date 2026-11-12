@@ -106,8 +106,8 @@ export function addArch(cx, cz, alongZ) {
   g.translate(cx, 0, cz); worldUV(g, 3, 0, 0, 0);
   const m = new THREE.Mesh(g, M.stone); scene.add(m); shootables.push(m);
   // dressed-stone ring around the opening
-  // the ring's inner edge is 1 cm inside the arch's curved face (1.49, not 1.5): equal radii z-fight at the top of the opening
-  const rg = new THREE.Shape(); rg.absarc(0, 2.6, 1.72, 0, Math.PI, false); rg.absarc(0, 2.6, 1.49, Math.PI, 0, true);
+  // the ring's inner edge is 5 cm inside the arch's curved face (1.45, not 1.5): a 1 cm offset still flickered at the top of the opening
+  const rg = new THREE.Shape(); rg.absarc(0, 2.6, 1.72, 0, Math.PI, false); rg.absarc(0, 2.6, 1.45, Math.PI, 0, true);
   const g2 = new THREE.ExtrudeGeometry(rg, { depth: 1.16, bevelEnabled: false, curveSegments: 12 }); g2.translate(0, 0, -0.58);
   if (alongZ) g2.rotateY(Math.PI / 2);
   g2.translate(cx, 0, cz); worldUV(g2, 1.2, 0, 0, 0);

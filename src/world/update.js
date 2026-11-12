@@ -11,6 +11,7 @@ import { updateSearchlights } from '../effects/searchlight.js';
 import { updateEnemies } from '../enemies/ai.js';
 import { updateParticles } from '../effects/fx.js';
 import { updateGrenades } from '../effects/grenade.js';
+import { updateFlyover } from '../effects/flyover.js';
 import { SFX, setSirenOutdoors } from '../audio/audio.js';
 import { gun } from '../weapons/guns.js';
 
@@ -23,6 +24,7 @@ export function updateWorld(dt) {
   updateEnemies(dt);
   updateParticles(dt, camera);
   updateGrenades(dt);
+  updateFlyover(dt);
   for (const g of glows) g.quaternion.copy(camera.quaternion);
   // lights: flicker + muzzle flash
   lightDefs.forEach((l, i) => { l.f = 1 + Math.sin(S.time * 11 + i * 7) * 0.05 + Math.sin(S.time * 23.7 + i * 3) * 0.04; l.d = l.pos.distanceTo(camera.position); });

@@ -2,12 +2,12 @@
 // the procedural sound effects (noise and tone bursts) and the ambient drone.
 import * as THREE from 'three';
 import { clamp } from '../core/util.js';
-import { RADIO, CHATTER_RADIUS, K98_RELOAD_SPLIT_T, K98_RELOAD_COCK_T } from '../core/config.js';
+import { RADIO, RADIO_RANGE, CHATTER_RADIUS, DEATH_GAIN, FLYOVER, K98_RELOAD_SPLIT_T, K98_RELOAD_COCK_T } from '../core/config.js';
 import { CLIPS } from './clips.js';
 
 let AC = null, master, echoIn, noiseBuf, radioPanner = null;
 // decoded sample buffers; null until loaded (every sound falls back to its procedural version)
-const BUF = { kar98Shot: null, kar98Reload: null, kar98Rechamber: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, footstep: null, shouts: [], convos: [], deaths: [] };
+const BUF = { kar98Shot: null, kar98Reload: null, kar98Rechamber: null, mp40Shot: null, mp40Reload: null, siren: null, radio: null, grenade: null, footstep: null, planeFlyby: null, shouts: [], convos: [], deaths: [] };
 const SIREN_GAIN = 0.3;   // background air siren level under the drone
 const RADIO_GAIN = 1.1;   // German radio set level at its reference distance
 
@@ -50,6 +50,7 @@ function loadClips() {
   load(CLIPS.grenade).then(b => { BUF.grenade = b; });
   load(CLIPS.footstep).then(b => { BUF.footstep = b; });
   load(CLIPS.kar98Rechamber).then(b => { BUF.kar98Rechamber = b; });
+  load(CLIPS.planeFlyby).then(b => { BUF.planeFlyby = b; });
   CLIPS.shouts.forEach(u => load(u).then(b => { if (b) BUF.shouts.push(b); }));
   CLIPS.convos.forEach(u => load(u).then(b => { if (b) BUF.convos.push(b); }));
   CLIPS.deaths.forEach(u => load(u).then(b => { if (b) BUF.deaths.push(b); }));
@@ -71,11 +72,27 @@ export function setSirenOutdoors(outdoors) {
 function startRadio() {
   const s = AC.createBufferSource(); s.buffer = BUF.radio; s.loop = true;
   radioPanner = AC.createPanner();
-  radioPanner.panningModel = 'HRTF'; radioPanner.distanceModel = 'inverse';
-  radioPanner.refDistance = 2; radioPanner.maxDistance = 60; radioPanner.rolloffFactor = 1.3;
+  // linear falloff: full level at 2 m, silent at RADIO_RANGE (the inverse model never reaches zero, so the radio was still audible at spawn)
+  radioPanner.panningModel = 'HRTF'; radioPanner.distanceModel = 'linear';
+  radioPanner.refDistance = 2; radioPanner.maxDistance = RADIO_RANGE; radioPanner.rolloffFactor = 1;
   radioPanner.positionX.value = RADIO.x; radioPanner.positionY.value = RADIO.y + 0.2; radioPanner.positionZ.value = RADIO.z;
   const g = AC.createGain(); g.gain.value = RADIO_GAIN;
   s.connect(radioPanner); radioPanner.connect(g); g.connect(master); s.start();
+}
+// propeller flyover: plays the clip from a point that the caller moves with the aircraft each frame. The falloff is
+// linear, so the sound is loudest when the plane is overhead. Returns { move(x, y, z), stop() }, or null if not loaded.
+export function playFlyby(x, y, z) {
+  if (!AC || !BUF.planeFlyby) return null;
+  const s = AC.createBufferSource(); s.buffer = BUF.planeFlyby;
+  const p = AC.createPanner();
+  p.panningModel = 'HRTF'; p.distanceModel = 'linear';
+  p.refDistance = FLYOVER.refDist; p.maxDistance = FLYOVER.maxDist; p.rolloffFactor = 1;
+  const g = AC.createGain(); g.gain.value = FLYOVER.soundGain;
+  s.connect(p); p.connect(g); g.connect(master);
+  const move = (px, py, pz) => { p.positionX.value = px; p.positionY.value = py; p.positionZ.value = pz; };
+  move(x, y, z);
+  s.start();
+  return { move, stop: () => { try { s.stop(); } catch { /* already ended */ } } };
 }
 // keeps the audio listener on the camera each frame so the radio pans and fades with the player's view
 const fwd = new THREE.Vector3();
@@ -239,7 +256,7 @@ export const SFX = {
   // German soldier killed: half the time one of the death sounds plays (picked at random)
   death() {
     if (Math.random() < 0.5 || !BUF.deaths.length) return;
-    playBuf(BUF.deaths[(Math.random() * BUF.deaths.length) | 0], 0.4);
+    playBuf(BUF.deaths[(Math.random() * BUF.deaths.length) | 0], DEATH_GAIN);
   },
   // Kar98 clip going into the receiver: the first section of the reload sample again
   clipIn() {

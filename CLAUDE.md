@@ -11,6 +11,7 @@ Three.js WW2 shooter (PS1-style look), bundled with esbuild, packaged as a Windo
 - `npm run watch` — rebuild on save
 - `npm run exe` — full exe build → `outputs/Courtyard1944.exe` (Git Bash; ~2 min first run)
 - Debug URL flag: `?test` — exposes `window.__g` (start, fire, hold, setAds, weapon, reload, hurt, state, kills, player, gun, WEAPONS, enemies)
+- Hand tuning mode (`?test` only, `src/debug/handtune.js`; keys also in the file header and the on-screen panel): press `H` in the game. `Tab` switches left/right arm; arrows move the arm (left/right, forward/back as the player sees it), PgUp/PgDn up/down; `I`/`K` pitch, `J`/`L` yaw, `U`/`O` roll the whole arm about the grip point; Shift = fine steps; `V`/`B` next/previous camera view (first person, right, left, back, below, above); `P` prints the `HAND_OFFSETS` block to the panel and console (`P` again hides it). Edits live only in the page: the user presses `P` and pastes the block, which then goes into `HAND_OFFSETS` in `core/config.js`. Switch weapons with 1/2/3 or `__g.weapon(i)`. The mode keeps the game off the pause screen. To inspect hands yourself: `__g.start(); __g.weapon(1)` in the browser JS tool, then press `h` and `v` with the computer key action, screenshotting after each press.
 
 ## Browser smoke test (after any gameplay change)
 1. `npm run build` then `npm run serve` (leave running).
@@ -52,7 +53,8 @@ Entry: `src/game.js` (frame loop, `?test` hook). Everything else is an ES module
 | `world/props.js` | shared `R` (seeded RNG; build order yard1 → yard2 → detail), `crate()`, `AMMO_SPOTS` |
 | `world/targets.js` | practice targets |
 | `world/update.js` | per-frame world: targets, light flicker/selection, water, sky, rumble |
-| `weapons/guns.js` | weapon table `WEAPONS`, viewmodels, `gun` state, `G` (brass) |
+| `weapons/guns.js` | weapon table `WEAPONS`, viewmodels, `gun` state, `G` (brass); hands placed by `HAND_OFFSETS` |
+| `debug/handtune.js` | `?test` only: hand tuning mode (see Commands) |
 | `player/input.js` | keyboard/mouse listeners |
 | `player/update.js` | per-frame player: look, move, weapon state machine, reload/switch animation |
 | `player/shooting.js` | `fire()`, `tryReload()` |
@@ -74,6 +76,11 @@ Line numbers are no longer needed for navigation: find things by filename (see t
 - Arrays and objects in state (`enemies`, `player`, …) are mutated, never reassigned.
 - Adding a new cross-module scalar: add it to `S` in `core/state.js`, then read/write as `S.name`.
 - Import order in `game.js` matters only for top-level side effects (level build, guns build, soldier spawn). Keep `render/renderer.js` first.
+
+## Hand placement
+- Hands are baked per weapon (`tools/bake_hands.py`, `src/models/*_hands.json`); never re-bake just to move a hand: `HAND_OFFSETS` in `core/config.js` is per weapon index (0 Kar98, 1 MP40, 2 grenade), per hand `L`/`R`: `p` = grip point the hand was baked on (do not change), `d` = offset in gun space (metres; -x = player left, +z = back, +y = up), `r` = turn about `p` as [axis x, y, z, angle radians], `s` = optional uniform scale about `p` (default 1). Only hands move; weapon models and `WEAPON_DEFS` stay untouched.
+- Re-bake only to change the arm or finger *shape*: add a `poseL`/`poseR` dict to that weapon's `CFG` entry in `tools/bake_hands.py` (`bend` = elbow degrees, `curl` / `thumb` = 0 open .. 1 the pack's closed grip, `roll` = forearm roll degrees; `poleL`/`poleR` give the forearm direction). Run `blender -b -P tools/bake_hands.py -- OUT.json k98|mp40|nade BoltActionRifle.fbx` (Blender 5.2 is under Program Files; the FBX is inside `../courtyard-assets/models/Player/fps-animations-sniper-rifle.zip`: unzip into a scratch folder, never into the repo), then copy OUT.json to `src/models/`. The Kar98 left arm is baked this way (bend 30, curl 0.25, thumb 0.4, roll 180); after a re-bake reset that hand's `r` in `HAND_OFFSETS` to `[0, 1, 0, 0]` and re-tune `d`.
+- In the user's words "left/right/back" mean the player's first-person view: left = -x, right = +x, back = +z.
 
 ## Conventions
 - Units are metres; +Y up; soldiers face +z; muzzle along -Z (three.js axes).

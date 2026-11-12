@@ -69,9 +69,10 @@ import death_07 from './clips/german_death_07.wav';
 import death_08 from './clips/german_death_08.wav';
 import death_09 from './clips/german_death_09.wav';
 import death_10 from './clips/german_death_10.wav';
+import planeFlyby from './clips/plane_flyby.mp3';   // small propeller plane flyby (courtyard-assets audio/Vehicles)
 
 export const CLIPS = {
-  kar98Shot, kar98Reload, kar98Rechamber, mp40Shot, mp40Reload, siren, radio, grenade, footstep,
+  kar98Shot, kar98Reload, kar98Rechamber, mp40Shot, mp40Reload, siren, radio, grenade, footstep, planeFlyby,
   shouts: [
     shout_01,
     shout_02,

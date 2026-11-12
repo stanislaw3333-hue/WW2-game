@@ -13,7 +13,7 @@ fail() { echo "BUILD FAILED: $1"; [ -f "$LOG" ] && tail -20 "$LOG"; exit 1; }
 [ -d node_modules/esbuild ] || npm install --no-audit --no-fund >"$LOG" 2>&1 || fail "npm install"
 
 echo "[1/4] bundling game"
-npx esbuild src/game.js --bundle --minify --loader:.png=dataurl --loader:.mp3=dataurl --outfile=app/game.js --log-level=warning || fail "esbuild"
+npx esbuild src/game.js --bundle --minify --loader:.png=dataurl --loader:.mp3=dataurl --loader:.wav=dataurl --outfile=app/game.js --log-level=warning || fail "esbuild"
 
 echo "[2/4] staging electron shell"
 rm -rf .exe-build/app/dist

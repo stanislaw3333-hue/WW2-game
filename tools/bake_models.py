@@ -27,6 +27,9 @@ CFG = {
                          "wood": "wood", "woodbed": "wood", "planks": "wood", "ASH": "wood",
                          "Glass": "glass", "dirty_glass": "glass", "dirty windshield": "glass",
                          "headlight glass": "glass", "mirror": "glass"}),
+    # Junkers Ju87: length along X (the fuselage, 11 m); bake_plane.py turns the nose onto X first. Its materials
+    # all bake to the default key ("metal") and the game colours them dark itself.
+    "ju87": dict(length=11.0, rot=None, muzzle=None, origin_x=None, drop=[], mats={}),
     "pz1": dict(length=5.4, rot=None, muzzle=None, origin_x=None, drop=[],
                 mats={"gray": "armor", "black": "tire"}),
     "pg": dict(height=1.8, rot=None, muzzle=None, origin_x=None, drop=[], pose="carry",

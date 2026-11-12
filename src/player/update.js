@@ -66,8 +66,10 @@ export function update(dt) {
   } else if (gun.state === 'throw') {
     // stielhandgranate: wind back, whip forward, let go at the release frame, then the next grenade is readied from reserve
     const t = gun.t;
-    thr = sstep(0, 0.3, t) * (1 - sstep(GRENADE.releaseT, GRENADE.releaseT + 0.08, t));
-    whip = sstep(GRENADE.releaseT, GRENADE.releaseT + 0.12, t) * (1 - sstep(0.6, GRENADE.throwT, t));
+    // slow raise (thr: 1 = arm up and back), then the swing forward (whip: 1 = arm out in front); the grenade leaves just as the arm starts to come down, and the short swing ends soon after
+    const swing = sstep(GRENADE.windT, GRENADE.windT + GRENADE.swingT, t);
+    thr = sstep(0, GRENADE.windT, t) * (1 - swing);
+    whip = swing * (1 - sstep(GRENADE.throwT - 0.3, GRENADE.throwT, t));
     if (!gun.thrown && t >= GRENADE.releaseT) { gun.thrown = true; launchGrenade(); SFX.grenadeThrow(); }
     if (t >= GRENADE.throwT) { gun.state = 'idle'; const n = Math.min(w.mag - w.ammo, w.reserve); w.ammo += n; w.reserve -= n; }
   } else if (!w.auto) {
@@ -112,10 +114,19 @@ export function update(dt) {
     lerp(cw.hip[1], cw.adsY, a) + by + breathe + gun.swayY * (1 - a * 0.7) - cyc * 0.018 - low * 0.05 - (sprint ? 0.03 : 0) * (1 - a),
     lerp(cw.hip[2], cw.adsZ, a) + k * cw.kz);
   gm.root.rotation.set(lerp(0.035, 0, a) + k * cw.kr - low * 0.25 + cyc * 0.03, lerp(cw.hipYaw, 0, a) + gun.swayX * 1.5 + low * 0.2, -cyc * 0.22 + low * 0.3 - gun.swayX * 2);
+  // aim down sights: the back of the gun is lifted by adsTilt about the muzzle, so the muzzle (the flash point) stays where it is
+  const tilt = -(cw.adsTilt || 0) * a;   // negative x turns the +Z (back) end up
+  const fy = gm.flash.position.y, fz = gm.flash.position.z, cs = Math.cos(tilt), sn = Math.sin(tilt);
+  gm.root.rotation.x += tilt;
+  gm.root.position.y += fy - (fy * cs - fz * sn);
+  gm.root.position.z += fz - (fy * sn + fz * cs);
   if (cw.kind === 'grenade') {
-    // throw pose: the head of the grenade tips up and back on the windup, then snaps down and across through the release
-    gm.root.position.z += thr * 0.1; gm.root.position.y += thr * 0.04 - whip * 0.05;
-    gm.root.rotation.x += thr * 0.8 - whip * 1.2; gm.root.rotation.y -= whip * 0.35;
+    // overarm throw: the arm is raised high and back on the windup (head tipped back), then swings forward and down over the top through the release
+    // the whole viewmodel turns about the bottom of the arm (GRENADE.pivot, in grenade space), like an arm swinging from the shoulder: up and back on the windup, forward on the swing
+    const q0 = gm.root.quaternion.clone();
+    gm.root.rotation.x += thr * GRENADE.raiseAng - whip * GRENADE.forwardAng; gm.root.rotation.y -= whip * 0.2;
+    const pv = new V3(...GRENADE.pivot);
+    gm.root.position.add(pv.clone().applyQuaternion(q0)).sub(pv.clone().applyQuaternion(gm.root.quaternion));
     gm.nade.visible = gun.state === 'throw' ? !gun.thrown : w.ammo > 0;   // the grenade in hand; gone once released
   } else if (!cw.auto) {
     gm.bolt.rotation.z = rot * 1.45; gm.bolt.position.z = -0.045 + back * 0.085;
